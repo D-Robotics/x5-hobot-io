@@ -870,12 +870,9 @@ do_peripheral() {
   rootpartnum=${rootdevice##mmc*p}
   if [ $rootpartnum -gt 2 ];then
       case $hex_btype in
-      "0x104"|"0x304")
-          config="/etc/hobot.conf/sdbv3.conf"
-          ;;
-      "0x404")
-          config="/etc/hobot.conf/sdbv4.conf"
-          ;;
+       "0x301")
+          config="/etc/hobot.conf/x5rdk.conf"
+          ;; 
       *)
           echo "Unsupport board type!!"
           exit -1
@@ -897,33 +894,10 @@ do_peripheral() {
       fi
   elif [ $rootpartnum -eq 1 ] || [ $rootpartnum -eq 2 ];then
       if [ -d "/boot/hobot" ];then
-          config="/etc/hobot.conf/x3pi.conf"
           case $hex_btype in
-          "0x101"|"0x102")
-              dtb_name="hobot-x3-dvb.dtb"
-              ;;
-          "0x103"|"0x203")
-              dtb_name="hobot-xj3-cvb.dtb"
-              ;;
-          "0x104"|"0x304")
-              dtb_name="hobot-x3-sdb.dtb"
-              ;;
-          "0x404")
-              dtb_name="hobot-x3-sdb_v4.dtb"
-              ;;
-          "0x504")
-              dtb_name="hobot-x3-pi.dtb"
-              ;;
-          "0x604")
-              dtb_name="hobot-x3-pi.dtb"
-              ;;
-          "0x804")
-              config="/etc/hobot.conf/rdkx3_v2_1.conf"
-              dtb_name="hobot-x3-pi_v2_1.dtb"
-              ;;
-          "0xb04")
-              config="/etc/hobot.conf/x3cm.conf"
-              dtb_name="hobot-x3-cm.dtb"
+          "0x301")
+              config="/etc/hobot.conf/x5rdk.conf"
+              dtb_name="x5-rdk.dtb"
               ;;
           *)
               echo "Unsupport board type!!"
