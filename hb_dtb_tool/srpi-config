@@ -13,61 +13,21 @@ if [ -z "$USER" ] || [ "$USER" = "root" ]; then
   USER=$(getent passwd | awk -F: '$3 == "1000" {print $1}')
 fi
 
-is_rdk () {
-  ARCH=$(dpkg --print-architecture)
-  if [ "$ARCH" = "arm64" ] ; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-is_rdk1() {
-  grep -q "^5$" /sys/class/socinfo/som_name
-  return $?
-}
-
-is_rdk1_2() {
-  grep -q "^6$" /sys/class/socinfo/som_name
-  return $?
-}
-
-is_rdk2() {
-  grep -q "^8$" /sys/class/socinfo/som_name
-  return $?
-}
-
-is_rdkmd() {
-  grep -q "^b$" /sys/class/socinfo/som_name
-  return $?
-}
-
-get_rdk_type() {
-  if is_rdk1; then
-    echo 5
-  elif is_rdk1_2; then
-    echo 6
-  elif is_rdk2; then
-    echo 8
-  elif is_rdkmd; then
-    echo b
-  else
-    echo -1
-  fi
-}
-
 get_rdk_type_string() {
-  if is_rdk1; then
-    echo "rdk_v1_x"
-  elif is_rdk1_2; then
-    echo "rdk_v1_x"
-  elif is_rdk2; then
-    echo "rdk_v2"
-  elif is_rdkmd; then
-    echo "rdk_md"
-  else
+  board_id=$(cat /sys/class/socinfo/board_id)
+  board_type=$((0x$board_id & 0xfff))
+  hex_btype=$(printf "0x%x" $board_type)
+
+  case $hex_btype in
+  "0x301")
+    echo "x5_rdk"
+    ;; 
+  *)
     echo "null"
-  fi
+    exit -1
+  ;;
+  esac
+
 }
 
 is_installed() {
@@ -1156,33 +1116,50 @@ get_total_memory()
   echo ${rounded_mem}
 }
 
-get_ion_memory ()
+get_ion_cma_memory ()
 {
-  if [ -e /proc/device-tree/reserved-memory/ion_cma/size ] ; then
-    ion_cma_size_hex=$(xxd -s 4 -l 4 -p /proc/device-tree/reserved-memory/ion_cma/size | tr -d " \t\n\r")
-    ion_cma_size_dec=$((16#${ion_cma_size_hex}))
-    ion_cma_size_mb=$((ion_cma_size_dec / (1024 * 1024)))
-    echo ${ion_cma_size_mb}"MB"
-  else
-    echo "672MB"
-  fi
+  ion_size=$(awk '/total size/ {print $5}' /sys/kernel/debug/ion/heaps/ion_cma)
+  ion_size=$(( ion_size / (1024 * 1024) ))
+  echo ${ion_size}
 }
 
-do_config_ion_memory ()
+get_cma_reserved_memory ()
+{
+  ion_size=$(awk '/total size/ {print $5}' /sys/kernel/debug/ion/heaps/cma_reserved)
+  ion_size=$(( ion_size / (1024 * 1024) ))
+  echo ${ion_size}
+}
+
+get_carveout_memory ()
+{
+  ion_size=$(awk '/total size/ {print $5}' /sys/kernel/debug/ion/heaps/carveout)
+  ion_size=$(( ion_size / (1024 * 1024) ))
+  echo ${ion_size}
+}
+
+do_config_ion_cma ()
 {
   if [ "$INTERACTIVE" = True ]; then
-    CUR=$(get_ion_memory)
-    if [ "$CUR" = "" ] ; then
-      CUR=672MB
-    fi
-    total_mem=$(get_total_memory)
-    if [ ${total_mem} -ge 4 ]; then
-      FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item $CUR --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-        "512MB" "" "672MB" "" "768MB" "" "1024MB" "" "1280MB" "" "1536MB" "" "1664MB" "" "1700MB" "" "1900MB" "Only supported on 4GB memory models" 3>&1 1>&2 2>&3)
-    else
-       FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item $CUR --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-        "512MB" "" "672MB" "" "768MB" "" "1024MB" "" "1280MB" "" "1536MB" "" "1664MB" "" "1700MB" "" 3>&1 1>&2 2>&3)
-    fi
+    CUR=$(get_ion_cma_memory)
+    #CUR=$(whiptail --inputbox "Please enter ion_cma MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
+
+    while true; do
+        CUR=$(whiptail --inputbox "Please enter ion_cma_size MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
+  
+        if [ -z "$CUR" ]; then
+            whiptail --msgbox "The input cannot be empty" 20 60
+            continue
+        fi
+        
+        if [ $((CUR % 64)) -ne 0 ]; then
+            whiptail --msgbox "The input must be a multiple of 64" 20 60
+            continue
+        fi
+
+        break
+    done
+
+    FUN=${CUR}
     RET=$?
   else
     FUN=$1
@@ -1191,17 +1168,126 @@ do_config_ion_memory ()
   if [ $RET -eq 1 ]; then
     return 0
   elif [ $RET -eq 0 ]; then
-    ion_cma_size_mb=$(echo ${FUN} | sed 's/MB//')
-    ion_cma_size_hex=$(printf "0x%x" "$((ion_cma_size_mb * 1024 * 1024))")
-    if grep -q "dtoverlay=ion_resize,size=" "${CONFIG}" || grep -q "#dtoverlay=ion_resize,size=" "${CONFIG}"; then
-      sed -i "s/\(dtoverlay=ion_resize,size=\|#dtoverlay=ion_resize,size=\).*/dtoverlay=ion_resize,size=${ion_cma_size_hex}/" "${CONFIG}"
+    ion_size_mb=$(echo ${FUN})
+    ion_size_hex=$(printf "0x%x" "$((ion_size_mb * 1024 * 1024))")
+    if grep -q "ion=ion_cma_size=" "${CONFIG}" || grep -q "#ion=ion_cma_size=" "${CONFIG}"; then
+      sed -i "s/\(ion=ion_cma_size=\|#ion=ion_cma_size=\).*/ion=ion_cma_size=${ion_size_hex}/" "${CONFIG}"
     else
-      echo "dtoverlay=ion_resize,size=${ion_cma_size_hex}" >> "${CONFIG}"
+      echo "ion=ion_cma_size=${ion_size_hex}" >> "${CONFIG}"
     fi
     if [ "$INTERACTIVE" = True ]; then
       whiptail --msgbox "The ion memory is set to ${FUN}" 20 60 1
       ASK_TO_REBOOT=1
     fi
+  fi
+}
+
+do_config_ion_reserved ()
+{
+  if [ "$INTERACTIVE" = True ]; then
+    CUR=$(get_cma_reserved_memory)
+    #CUR=$(whiptail --inputbox "Please enter ion_cma MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
+
+    while true; do
+        CUR=$(whiptail --inputbox "Please enter ion_reserved_size MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
+  
+        if [ -z "$CUR" ]; then
+            whiptail --msgbox "The input cannot be empty" 20 60
+            continue
+        fi
+        
+        if [ $((CUR % 64)) -ne 0 ]; then
+            whiptail --msgbox "The input must be a multiple of 64" 20 60
+            continue
+        fi
+
+        break
+    done
+
+    FUN=${CUR}
+    RET=$?
+  else
+    FUN=$1
+    RET=0
+  fi
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    ion_size_mb=$(echo ${FUN})
+    ion_size_hex=$(printf "0x%x" "$((ion_size_mb * 1024 * 1024))")
+    if grep -q "ion=ion_reserved_size=" "${CONFIG}" || grep -q "#ion=ion_reserved_size=" "${CONFIG}"; then
+      sed -i "s/\(ion=ion_reserved_size=\|#ion=ion_reserved_size=\).*/ion=ion_reserved_size=${ion_size_hex}/" "${CONFIG}"
+    else
+      echo "ion=ion_reserved_size=${ion_size_hex}" >> "${CONFIG}"
+    fi
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "The ion memory is set to ${FUN}" 20 60 1
+      ASK_TO_REBOOT=1
+    fi
+  fi
+}
+
+do_config_ion_carveout ()
+{
+  if [ "$INTERACTIVE" = True ]; then
+    CUR=$(get_carveout_memory)
+    #CUR=$(whiptail --inputbox "Please enter ion_cma MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
+
+    while true; do
+        CUR=$(whiptail --inputbox "Please enter ion_carveout_size MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
+  
+        if [ -z "$CUR" ]; then
+            whiptail --msgbox "The input cannot be empty" 20 60
+            continue
+        fi
+        
+        if [ $((CUR % 64)) -ne 0 ]; then
+            whiptail --msgbox "The input must be a multiple of 64" 20 60
+            continue
+        fi
+
+        break
+    done
+
+    FUN=${CUR}
+    RET=$?
+  else
+    FUN=$1
+    RET=0
+  fi
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    ion_size_mb=$(echo ${FUN})
+    ion_size_hex=$(printf "0x%x" "$((ion_size_mb * 1024 * 1024))")
+    if grep -q "ion=ion_carveout_size=" "${CONFIG}" || grep -q "#ion=ion_carveout_size=" "${CONFIG}"; then
+      sed -i "s/\(ion=ion_carveout_size=\|#ion=ion_carveout_size=\).*/ion=ion_carveout_size=${ion_size_hex}/" "${CONFIG}"
+    else
+      echo "ion=ion_carveout_size=${ion_size_hex}" >> "${CONFIG}"
+    fi
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "The ion memory is set to ${FUN}" 20 60 1
+      ASK_TO_REBOOT=1
+    fi
+  fi
+}
+
+do_config_ion_memory () {
+  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "ION Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "P1 ion_cma" "Configure ion_cma memory size" \
+      "P2 ion_reserved" "Configure ion_reserved memory size" \
+      "P3 ion_carveout" "Configure ion_carveout memory size" \
+      3>&1 1>&2 2>&3)
+  RET=$?
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    case "$FUN" in
+      P1\ *) do_config_ion_cma ;;
+      P2\ *) do_config_ion_reserved ;;
+      P3\ *) do_config_ion_carveout ;;
+      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
+    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
 }
 
@@ -1433,12 +1519,8 @@ do_sound_devices_select() {
     board_type_string=$(get_rdk_type_string)
     audio_options=("UNSET")
 
-    if [ $board_type_string == "rdk_md" ] || [ $board_type_string == "rdk_v2" ]; then
-      audio_options=("""Audio Driver HAT V2""" "    4 chn input and 2 chn ouput"  """WM8960 Audio HAT"""  "    2 chn input and 2 chn ouput"  ""UNSET"" "    Unset audio driver hat")
-    fi
-
-    if [ $board_type_string == "rdk_v1_x" ]; then
-      audio_options=("""Audio Driver HAT V1""" "    4 chn input and 2 chn ouput"  """Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput"  ""UNSET"" "    Unset audio driver hat")
+    if [ $board_type_string == "x5_rdk" ]; then
+      audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput"  ""UNSET"" "    Unset audio driver hat")
     fi
 
 
@@ -1462,8 +1544,6 @@ do_sound_devices_select() {
     fi
     mkdir -p /etc/pulse/
     #if audio is wm8960 
-    modprobe hobot-i2s-dma
-    modprobe hobot-cpudai
     if [ "$FUN" == "WM8960 Audio HAT" ]; then
       if [ "$CUR" != "UNSET" ]; then
         do_unset_audio_hat
@@ -1548,13 +1628,6 @@ do_sound_devices_select() {
     else
       systemctl enable hobot-audio.service
     fi
-    # check miniboot version
-    cur_miniboot_version=$(strings /dev/mtd0 | grep -E "U-Boot 2018.09.*\(" | head -n 1)
-    getMinibootUpdateVersion
-    latest_miniboot_version=$(strings $MINIBOOT_UPDATE_IMAGE | grep -E "U-Boot 2018.09.*\(" | head -n 1)
-    if [ "$cur_miniboot_version" != "$latest_miniboot_version" ];then
-      whiptail --msgbox "Your miniboot version is: $cur_miniboot_version\n\nThe latest miniboot version is: $latest_miniboot_version \n\nMaybe you need to update miniboot to enable sound card.\n\nEnter 1 System Options -> S7 Update Miniboot to upgrade miniboot." $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT
-    fi
     ASK_TO_REBOOT=1
   fi
 }
@@ -1581,7 +1654,6 @@ do_unset_audio_hat(){
   sed -i '/^dtoverlay=audio_/d' /boot/config.txt
 }
 do_interface_menu() {
-  if is_rdk2 ; then
     FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Interfacing Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
       "I1 SSH" "Enable/disable remote command line access using SSH" \
       "I2 VNC" "Enable/disable graphical remote desktop access" \
@@ -1589,14 +1661,6 @@ do_interface_menu() {
       "I4 Configure Wi-Fi antenna" "Configure Wi-Fi antennas to use onboard or external antenna" \
       "I5 Audio" "Configure audio peripheral functions" \
       3>&1 1>&2 2>&3)
-  else
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Interfacing Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-      "I1 SSH" "Enable/disable remote command line access using SSH" \
-      "I2 VNC" "Enable/disable graphical remote desktop access" \
-      "I3 Peripheral bus config" "Enable/disable peripheral bus(spi,i2c,serial,i2s,etc.)" \
-      "I5 Audio" "Configure audio peripheral functions" \
-      3>&1 1>&2 2>&3)
-  fi
   RET=$?
   if [ $RET -eq 1 ]; then
     return 0
