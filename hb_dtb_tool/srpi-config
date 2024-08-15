@@ -549,6 +549,41 @@ do_browser() {
   fi
 }
 
+do_drm_display_chose() {
+  if [ "$INTERACTIVE" = True ]; then
+    RES=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+      "1" "DSI" \
+      "2" "HDMI" \
+      3>&1 1>&2 2>&3)
+  else
+    RES=""
+    BROWSER=$1
+    true
+  fi
+  if [ $? -eq 0 ]; then
+    if [ "$RES" = "1" ] ; then
+      if [ -e /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf ]; then
+          mv /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf.disable
+      fi
+      if [ -e /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf.disable ]; then
+          mv /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf.disable /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf
+      fi
+      BSTRING="DSI"
+    elif [ "$RES" = "2" ] ; then
+      if [ -e /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf ]; then
+          mv /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf.disable
+      fi
+      if [ -e /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf.disable ]; then
+          mv /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf.disable /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf
+      fi
+      BSTRING="HDMI"
+    fi
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "Default display set to $BSTRING" 20 60 1
+    fi
+  fi
+}
+
 do_update_miniboot()
 {
   DEFAULT=--defaultno
@@ -1464,7 +1499,7 @@ do_system_menu() {
 
 do_display_menu() {
   FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-    "D1 FB Console Resolution" "Set resolution for framebuffer console" \
+    "D1 Dsiplay Chose" " DSI or HDMI" \
     3>&1 1>&2 2>&3)
 
   RET=$?
@@ -1472,12 +1507,11 @@ do_display_menu() {
     return 0
   elif [ $RET -eq 0 ]; then
     case "$FUN" in
-      D1\ *) do_fb_console_resolution ;;
+      D1\ *) do_drm_display_chose ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
 }
-
 
 get_cur_audio_hat(){
   if [ -f /etc/hobot_audio_config/cur_audio_hat ]; then
