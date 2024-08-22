@@ -1155,46 +1155,32 @@ get_ion_cma_memory ()
 {
   ion_size=$(awk '/total size/ {print $5}' /sys/kernel/debug/ion/heaps/ion_cma)
   ion_size=$(( ion_size / (1024 * 1024) ))
-  echo ${ion_size}
+  echo ${ion_size}"MB"
 }
 
 get_cma_reserved_memory ()
 {
   ion_size=$(awk '/total size/ {print $5}' /sys/kernel/debug/ion/heaps/cma_reserved)
   ion_size=$(( ion_size / (1024 * 1024) ))
-  echo ${ion_size}
+  echo ${ion_size}"MB"
 }
 
 get_carveout_memory ()
 {
   ion_size=$(awk '/total size/ {print $5}' /sys/kernel/debug/ion/heaps/carveout)
   ion_size=$(( ion_size / (1024 * 1024) ))
-  echo ${ion_size}
+  echo ${ion_size}"MB"
 }
 
-do_config_ion_cma ()
+do_config_ion_memory ()
 {
   if [ "$INTERACTIVE" = True ]; then
-    CUR=$(get_ion_cma_memory)
-    #CUR=$(whiptail --inputbox "Please enter ion_cma MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
-
-    while true; do
-        CUR=$(whiptail --inputbox "Please enter ion_cma_size MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
-  
-        if [ -z "$CUR" ]; then
-            whiptail --msgbox "The input cannot be empty" 20 60
-            continue
-        fi
-        
-        if [ $((CUR % 64)) -ne 0 ]; then
-            whiptail --msgbox "The input must be a multiple of 64" 20 60
-            continue
-        fi
-
-        break
-    done
-
-    FUN=${CUR}
+    CUR=$(get_ion_cma_memory)+$(get_cma_reserved_memory)+$(get_carveout_memory)
+    if [ "$CUR" = "" ] ; then
+      CUR=128MB+320MB+320MB
+    fi
+    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item $CUR --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    "128MB+320MB+320MB" "" "192MB+384MB+384MB" "" "256MB+512MB+512MB" "" "320MB+640MB+640MB" "" "512MB+1024MB+1024MB" "" 3>&1 1>&2 2>&3)
     RET=$?
   else
     FUN=$1
@@ -1203,126 +1189,38 @@ do_config_ion_cma ()
   if [ $RET -eq 1 ]; then
     return 0
   elif [ $RET -eq 0 ]; then
-    ion_size_mb=$(echo ${FUN})
-    ion_size_hex=$(printf "0x%x" "$((ion_size_mb * 1024 * 1024))")
+    IFS='+' read -r ion_cma_size_mb ion_reserved_size_mb ion_carveout_size_mb <<< "$FUN"
+
+    ion_cma_size_mb=$(echo ${ion_cma_size_mb} | sed 's/MB//')
+    ion_cma_size_hex=$(printf "0x%x" "$((ion_cma_size_mb * 1024 * 1024))")
+
+    ion_reserved_size_mb=$(echo ${ion_reserved_size_mb} | sed 's/MB//')
+    ion_reserved_size_hex=$(printf "0x%x" "$((ion_reserved_size_mb * 1024 * 1024))")
+
+    ion_carveout_size_mb=$(echo ${ion_carveout_size_mb} | sed 's/MB//')
+    ion_carveout_size_hex=$(printf "0x%x" "$((ion_carveout_size_mb * 1024 * 1024))")
+
     if grep -q "ion=ion_cma_size=" "${CONFIG}" || grep -q "#ion=ion_cma_size=" "${CONFIG}"; then
-      sed -i "s/\(ion=ion_cma_size=\|#ion=ion_cma_size=\).*/ion=ion_cma_size=${ion_size_hex}/" "${CONFIG}"
+      sed -i "s/\(ion=ion_cma_size=\|#ion=ion_cma_size=\).*/ion=ion_cma_size=${ion_cma_size_hex}/" "${CONFIG}"
     else
-      echo "ion=ion_cma_size=${ion_size_hex}" >> "${CONFIG}"
+      echo "ion=ion_cma_size=${ion_cma_size_hex}" >> "${CONFIG}"
     fi
-    if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "The ion memory is set to ${FUN}" 20 60 1
-      ASK_TO_REBOOT=1
-    fi
-  fi
-}
 
-do_config_ion_reserved ()
-{
-  if [ "$INTERACTIVE" = True ]; then
-    CUR=$(get_cma_reserved_memory)
-    #CUR=$(whiptail --inputbox "Please enter ion_cma MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
-
-    while true; do
-        CUR=$(whiptail --inputbox "Please enter ion_reserved_size MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
-  
-        if [ -z "$CUR" ]; then
-            whiptail --msgbox "The input cannot be empty" 20 60
-            continue
-        fi
-        
-        if [ $((CUR % 64)) -ne 0 ]; then
-            whiptail --msgbox "The input must be a multiple of 64" 20 60
-            continue
-        fi
-
-        break
-    done
-
-    FUN=${CUR}
-    RET=$?
-  else
-    FUN=$1
-    RET=0
-  fi
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
-    ion_size_mb=$(echo ${FUN})
-    ion_size_hex=$(printf "0x%x" "$((ion_size_mb * 1024 * 1024))")
     if grep -q "ion=ion_reserved_size=" "${CONFIG}" || grep -q "#ion=ion_reserved_size=" "${CONFIG}"; then
-      sed -i "s/\(ion=ion_reserved_size=\|#ion=ion_reserved_size=\).*/ion=ion_reserved_size=${ion_size_hex}/" "${CONFIG}"
+      sed -i "s/\(ion=ion_reserved_size=\|#ion=ion_reserved_size=\).*/ion=ion_reserved_size=${ion_carveout_size_hex}/" "${CONFIG}"
     else
-      echo "ion=ion_reserved_size=${ion_size_hex}" >> "${CONFIG}"
+      echo "ion=ion_reserved_size=${ion_carveout_size_hex}" >> "${CONFIG}"
     fi
-    if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "The ion memory is set to ${FUN}" 20 60 1
-      ASK_TO_REBOOT=1
-    fi
-  fi
-}
 
-do_config_ion_carveout ()
-{
-  if [ "$INTERACTIVE" = True ]; then
-    CUR=$(get_carveout_memory)
-    #CUR=$(whiptail --inputbox "Please enter ion_cma MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
-
-    while true; do
-        CUR=$(whiptail --inputbox "Please enter ion_carveout_size MB" 20 60 "${CUR}" 3>&1 1>&2 2>&3)
-  
-        if [ -z "$CUR" ]; then
-            whiptail --msgbox "The input cannot be empty" 20 60
-            continue
-        fi
-        
-        if [ $((CUR % 64)) -ne 0 ]; then
-            whiptail --msgbox "The input must be a multiple of 64" 20 60
-            continue
-        fi
-
-        break
-    done
-
-    FUN=${CUR}
-    RET=$?
-  else
-    FUN=$1
-    RET=0
-  fi
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
-    ion_size_mb=$(echo ${FUN})
-    ion_size_hex=$(printf "0x%x" "$((ion_size_mb * 1024 * 1024))")
     if grep -q "ion=ion_carveout_size=" "${CONFIG}" || grep -q "#ion=ion_carveout_size=" "${CONFIG}"; then
-      sed -i "s/\(ion=ion_carveout_size=\|#ion=ion_carveout_size=\).*/ion=ion_carveout_size=${ion_size_hex}/" "${CONFIG}"
+      sed -i "s/\(ion=ion_carveout_size=\|#ion=ion_carveout_size=\).*/ion=ion_carveout_size=${ion_carveout_size_hex}/" "${CONFIG}"
     else
-      echo "ion=ion_carveout_size=${ion_size_hex}" >> "${CONFIG}"
+      echo "ion=ion_carveout_size=${ion_carveout_size_hex}" >> "${CONFIG}"
     fi
     if [ "$INTERACTIVE" = True ]; then
       whiptail --msgbox "The ion memory is set to ${FUN}" 20 60 1
       ASK_TO_REBOOT=1
     fi
-  fi
-}
-
-do_config_ion_memory () {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "ION Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-      "P1 ion_cma" "Configure ion_cma memory size" \
-      "P2 ion_reserved" "Configure ion_reserved memory size" \
-      "P3 ion_carveout" "Configure ion_carveout memory size" \
-      3>&1 1>&2 2>&3)
-  RET=$?
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
-    case "$FUN" in
-      P1\ *) do_config_ion_cma ;;
-      P2\ *) do_config_ion_reserved ;;
-      P3\ *) do_config_ion_carveout ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
 }
 
