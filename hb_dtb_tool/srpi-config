@@ -1545,7 +1545,7 @@ do_sound_devices_select() {
         #echo "The original configuration file has been renamed default.bak"
         #echo 
       fi
-      cp  /etc/hobot_audio_config/01_hobot_audio_module.conf /etc/modules-load.d/
+      cp  /etc/hobot_audio_config/99_hobot_audio_module.conf /etc/modules-load.d/
       #enable iis driver audo load at boot
       if [ -e /lib/modprobe.d/blacklist-hobot-iis.conf ]; then
         mv  /lib/modprobe.d/blacklist-hobot-iis.conf /lib/modprobe.d/blacklist-hobot-iis.disable
