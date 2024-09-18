@@ -23,25 +23,25 @@ const char *program_invocation_name = NULL;
 const char *program_invocation_short_name = NULL;
 
 int asprintf(char **strp, const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    int len = vsnprintf(NULL, 0, fmt, args);
-    va_end(args);
-    if (len < 0) return -1;
-    
-    *strp = (char *)malloc(len + 1);
-    if (*strp == NULL) return -1;
-    
-    va_start(args, fmt);
-    int ret = vsnprintf(*strp, len + 1, fmt, args);
-    va_end(args);
-    
-    if (ret < 0) {
-        free(*strp);
-        *strp = NULL;
-        return -1;
-    }
-    return ret;
+	va_list args;
+	va_start(args, fmt);
+	int len = vsnprintf(NULL, 0, fmt, args);
+	va_end(args);
+	if (len < 0) return -1;
+
+	*strp = (char *)malloc(len + 1);
+	if (*strp == NULL) return -1;
+
+	va_start(args, fmt);
+	int ret = vsnprintf(*strp, len + 1, fmt, args);
+	va_end(args);
+
+	if (ret < 0) {
+		free(*strp);
+		*strp = NULL;
+		return -1;
+	}
+	return ret;
 }
 
 const char *get_progname(void)
@@ -351,7 +351,6 @@ static void print_consumer(struct gpiod_line_info *info, bool unquoted)
 		printf("%*s", 15, "");
 		return;
 	}
-		
 
 	consumer = gpiod_line_info_get_consumer(info);
 	if (!consumer)
@@ -360,9 +359,9 @@ static void print_consumer(struct gpiod_line_info *info, bool unquoted)
 	buffer[14] = '\0';
 	//fmt = unquoted ? " consumer=%s" : " consumer=\"%s\"";
 	fmt = unquoted ? " %-14s" : " \"%-14s\"";
-	
+
 	printf(fmt, consumer);
-	
+
 }
 
 void print_line_attributes(struct gpiod_line_info *info, bool unquoted_strings)
@@ -379,8 +378,7 @@ void print_line_attributes(struct gpiod_line_info *info, bool unquoted_strings)
 	}else{
 		printf("%*s", 12, "");
 	}
-	
-		
+
 
 	print_drive(info);
 	print_bias(info);
