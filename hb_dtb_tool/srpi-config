@@ -22,6 +22,9 @@ get_rdk_type_string() {
   "0x301")
     echo "x5_rdk"
     ;; 
+  "0x302")
+    echo "x5_rdk"
+    ;; 
   *)
     echo "null"
     exit -1
@@ -868,6 +871,9 @@ do_peripheral() {
        "0x301")
           config="/etc/hobot.conf/x5rdk.conf"
           ;; 
+       "0x302")
+          config="/etc/hobot.conf/x5rdk.conf"
+          ;; 
       *)
           echo "Unsupport board type!!"
           exit -1
@@ -893,6 +899,10 @@ do_peripheral() {
           "0x301")
               config="/etc/hobot.conf/x5rdk.conf"
               dtb_name="x5-rdk.dtb"
+              ;;
+          "0x302")
+              config="/etc/hobot.conf/x5rdk.conf"
+              dtb_name="x5-rdk-v1p0.dtb"
               ;;
           *)
               echo "Unsupport board type!!"

@@ -216,6 +216,7 @@ ALL_BOARD_DATA = [
     {'board_name' : 'X3CM', 'pin_info' : X3_CM_PIN, 'board_id' : 0xb04},
     {'board_name' : 'X3PI_V2_1', 'pin_info' : X3_PI_V2_1_PIN, 'board_id' : 0x804},
     {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x301},
+    {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x302},
 ]
 
 
