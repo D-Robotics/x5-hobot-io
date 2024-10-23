@@ -1595,6 +1595,59 @@ do_unset_audio_hat(){
   #delete dtoverlay setting step 1
   sed -i '/^dtoverlay=audio_/d' /boot/config.txt
 }
+
+do_imu_devices_select(){
+
+  #imu dtoverlay filename = (dtoverlay)_(imu)_(i2c5)_(x5_rdk).dts/dtbo
+
+  if [ "$INTERACTIVE" = True ]; then
+    # CUR=$(get_cur_audio_hat)
+    board_type_string=$(get_rdk_type_string)
+    dtfilehead="dtoverlay_imu_"
+    # audio_options=("UNSET")
+    if [ $board_type_string == "x5_rdk" ]; then
+      # imu_options=(""SPI-Interface" "" "I2C-Interface" """)
+      imu_options=("""SPI-Interface"""  "    Use SPI1 as the data interface for IMU."  ""I2C-Interface"" "    Use I2C5 as the data interface for IMU." ""UNSET"" "    Unset IMU driver hat")
+    fi
+    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "Onboard" --menu "Set IMU bmi088" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "${imu_options[@]}"  3>&1 1>&2 2>&3)
+    RET=$?
+    # echo "$FUN""  RET=""$RET"
+  else
+    FUN=$1
+    RET=0
+  fi
+  if [ $RET -eq 1 ]; then
+    # check select if success
+    return 0
+  elif [ $RET -eq 0 ]; then
+    # select not error
+    if [ "$FUN" == "UNSET" ]; then
+      if grep -q "^dtoverlay="$dtfilehead"" $CONFIG; then
+        # if exist set data del it
+        sed -i "/^dtoverlay="$dtfilehead".*/d" $CONFIG
+      fi
+      return 0
+    fi
+
+    if [ "$FUN" == "SPI-Interface" ]; then
+      dtfile=""$dtfilehead"spi1_"$board_type_string""
+    elif [ "$FUN" == "I2C-Interface" ]; then
+      dtfile=""$dtfilehead"i2c5_"$board_type_string""
+    fi
+    # check is there right dtoverlay config in config.txt
+    if grep -q "dtoverlay="$dtfilehead"" $CONFIG; then
+      # if wrong , sed with right
+      sed -i "s|dtoverlay="$dtfilehead".*|dtoverlay="$dtfile"|" $CONFIG
+    else
+      # if not exist, echo it
+      echo "dtoverlay="$dtfile"" >> $CONFIG
+    fi
+
+    return 0
+  fi
+}
+
 do_interface_menu() {
     FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Interfacing Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
       "I1 SSH" "Enable/disable remote command line access using SSH" \
@@ -1602,6 +1655,7 @@ do_interface_menu() {
       "I3 Peripheral bus config" "Enable/disable peripheral bus(spi,i2c,serial,i2s,etc.)" \
       "I4 Configure Wi-Fi antenna" "Configure Wi-Fi antennas to use onboard or external antenna" \
       "I5 Audio" "Configure audio peripheral functions" \
+      "I6 IMU" "Configure IMU peripheral functions" \
       3>&1 1>&2 2>&3)
   RET=$?
   if [ $RET -eq 1 ]; then
@@ -1613,6 +1667,7 @@ do_interface_menu() {
       I3\ *) do_peripheral ;;
       I4\ *) do_wifi_antenna ;;
       I5\ *) do_sound_devices_select ;;
+      I6\ *) do_imu_devices_select ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
