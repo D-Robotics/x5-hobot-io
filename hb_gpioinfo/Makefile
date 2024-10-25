@@ -11,7 +11,7 @@ SRCS = gpioinfo.c tools-common.c
 
 OBJS = $(SRCS:.c=.o)
 
-PREFIX = ../debian/usr/hobot/bin/
+PREFIX = ../debian/usr/bin/
 
 all: $(TARGET)
 
