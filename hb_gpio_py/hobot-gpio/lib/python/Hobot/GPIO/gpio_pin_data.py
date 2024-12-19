@@ -177,7 +177,7 @@ X3_PI_V2_1_PIN = [
 ]
 
 RDK_X5_PIN = [
-    ["soc/34000000.a55_apb0/34120000.gpio", 387, 3, 2, 'SDA', 'I2C5_SDA', None, None],                              #I2C5_SDA/UART3_TXD
+    ["soc/34000000.a55_apb0/34120000.gpio", 390, 3, 2, 'SDA', 'I2C5_SDA', None, None],                              #I2C5_SDA/UART3_TXD
     ["soc/34000000.a55_apb0/34120000.gpio", 389, 5, 3,'SCL', 'I2C5_SCL', None, None],                               #I2C5_SCL/UART3_RXD
     ["soc/32080000.dsp_apb/32150000.gpio", 420, 7, 4, 'GPCLK0', 'I2S1_MCLK', None, None],                           #I2S1_MCLK
     ["soc/34000000.a55_apb0/34120000.gpio", 380, 11, 17, 'GPIO17', 'UART7_TXD', None, None],                        #UART7_TXD
