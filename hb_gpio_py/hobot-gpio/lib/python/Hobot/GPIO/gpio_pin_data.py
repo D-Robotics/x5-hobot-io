@@ -208,6 +208,37 @@ RDK_X5_PIN = [
     ["soc/32080000.dsp_apb/32150000.gpio", 424, 40, 21, 'PCM_DOUT', 'I2S1_SDOUT', None, None],                      #I2S1_SDOUT
 ]
 
+EVB_X5_PIN = [
+    ["soc/34000000.a55_apb0/34120000.gpio", 390, 3, 2, 'SDA5', 'I2C5_SDA', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 389, 5, 3,'SCL5', 'I2C5_SCL', None, None],
+    ["soc/32080000.dsp_apb/32150000.gpio", 420, 7, 4, 'I2S1_MCLK', 'DSP_MCLK1', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 382, 11, 17, 'GPIO17', 'UART7_RTS', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 381, 13, 27,'GPIO27', 'UART7_CTS', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 385, 15, 22, 'GPIO22', 'UART1_CTS', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 402, 19, 10, 'SPI2_MOSI', 'SPI2_MOSI', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 401, 21, 9, 'SPI2_MISO', 'SPI2_MISO', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 399, 23, 11, 'SPI2_SCLK', 'SPI2_SCLK', None, None],
+    ["soc/34000000.a55_apb0/34130000.gpio", 357, 27, 0, 'SDA1', 'I2C1_SDA', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 379, 29, 5, 'GPIO5', 'UART7_RX', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 380, 31, 6, 'GPIO6', 'UART7_TX', None, None],
+    ["soc/34000000.a55_apb0/34130000.gpio", 354, 33, 13, 'PWM4', 'PWM4', "soc/34000000.a55_apb0/34160000.pwm",0], 
+    ["soc/32080000.dsp_apb/32150000.gpio", 422, 35, 19, 'I2S1_WS', 'I2S1_WS', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 386, 37, 26, 'GPIO26', 'UART1_RTS', None, None],
+
+    ["soc/34000000.a55_apb0/34120000.gpio", 387, 8, 14, 'TXD', 'UART2_TXD', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 388, 10, 15, 'RXD', 'UART2_RXD', None, None],
+    ["soc/32080000.dsp_apb/32150000.gpio", 421, 12, 18, 'I2S1_BCLK', 'I2S1_BCLK', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 383, 16, 23, 'GPIO23', 'UART1_RXD', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 384, 18, 24, 'GPIO24', 'UART1_TXD', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 391, 22, 25, 'GPIO25', 'UART4_RXD', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 400, 24, 8, 'SPI2_CSN', 'SPI2_CSN', None, None],
+    ["soc/34000000.a55_apb0/34120000.gpio", 392, 26, 7, 'GPIO7', 'UART4_TXD', None, None],
+    ["soc/34000000.a55_apb0/34130000.gpio", 356, 28, 1, 'SCL1', 'I2C1_SCL', None, None],
+    ["soc/34000000.a55_apb0/34130000.gpio", 355, 32, 12, 'PWM', 'PWM5', "soc/34000000.a55_apb0/34160000.pwm",1],
+    ["soc/32080000.dsp_apb/32150000.gpio", 423, 38, 20, 'I2S1_DI', 'I2S1_SDIN', None, None],
+    ["soc/32080000.dsp_apb/32150000.gpio", 424, 40, 21, 'I2S1_DO', 'I2S1_SDOUT', None, None],
+]
+
 ALL_BOARD_DATA = [
     {'board_name' : 'X3SDBV3', 'pin_info' : SDBV3_PIN, 'board_id' : 0x304},
     {'board_name' : 'X3SDB', 'pin_info' : SDB_PIN, 'board_id' : 0x404},
@@ -217,6 +248,10 @@ ALL_BOARD_DATA = [
     {'board_name' : 'X3PI_V2_1', 'pin_info' : X3_PI_V2_1_PIN, 'board_id' : 0x804},
     {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x301},
     {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x302},
+    {'board_name' : 'EVB_X5', 'pin_info' : EVB_X5_PIN, 'board_id' : 0x201}, #HOBOT_X5_EVB_LP4_1_A_ID
+    {'board_name' : 'EVB_X5', 'pin_info' : EVB_X5_PIN, 'board_id' : 0x202}, #HOBOT_X5_EVB_LP4_1_B_ID
+    {'board_name' : 'EVB_X5', 'pin_info' : EVB_X5_PIN, 'board_id' : 0x203}, #HOBOT_X5_EVB_LP4_V1P2_ID
+    {'board_name' : 'EVB_X5', 'pin_info' : EVB_X5_PIN, 'board_id' : 0x204}, #HOBOT_X5_EVB_LP4_V1P3_ID
 ]
 
 
