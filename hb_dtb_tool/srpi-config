@@ -25,12 +25,24 @@ get_rdk_type_string() {
   "0x302")
     echo "x5_rdk"
     ;; 
+  "0x501")
+    echo "x5_md"
+    ;; 
   *)
     echo "null"
     exit -1
   ;;
   esac
 
+}
+
+is_rdkmd() {
+  board_type_string=$(get_rdk_type_string)
+
+    if [ $board_type_string == "x5_md" ]; then
+      return 0
+    fi
+    return 1
 }
 
 is_installed() {
@@ -873,7 +885,10 @@ do_peripheral() {
           ;; 
        "0x302")
           config="/etc/hobot.conf/x5rdk.conf"
-          ;; 
+          ;;
+        "0x501")
+          config="/etc/hobot.conf/x5rdk.conf"
+          ;;
       *)
           echo "Unsupport board type!!"
           exit -1
@@ -903,6 +918,10 @@ do_peripheral() {
           "0x302")
               config="/etc/hobot.conf/x5rdk.conf"
               dtb_name="x5-rdk-v1p0.dtb"
+              ;;
+          "0x501")
+              config="/etc/hobot.conf/x5rdk.conf"
+              dtb_name="x5-md-v0p1.dtb"
               ;;
           *)
               echo "Unsupport board type!!"
@@ -1461,7 +1480,7 @@ do_sound_devices_select() {
     board_type_string=$(get_rdk_type_string)
     audio_options=("UNSET")
 
-    if [ $board_type_string == "x5_rdk" ]; then
+    if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
       audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput"  ""UNSET"" "    Unset audio driver hat")
     fi
 
@@ -1605,7 +1624,7 @@ do_imu_devices_select(){
     board_type_string=$(get_rdk_type_string)
     dtfilehead="dtoverlay_imu_"
     # audio_options=("UNSET")
-    if [ $board_type_string == "x5_rdk" ]; then
+    if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
       # imu_options=(""SPI-Interface" "" "I2C-Interface" """)
       imu_options=("""SPI-Interface"""  "    Use SPI1 as the data interface for IMU."  ""I2C-Interface"" "    Use I2C5 as the data interface for IMU." ""UNSET"" "    Unset IMU driver hat")
     fi
