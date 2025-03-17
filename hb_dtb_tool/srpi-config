@@ -1464,6 +1464,7 @@ do_sound_devices_select() {
     if [ $board_type_string == "x5_rdk" ]; then
       audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput" \
                     """Hiwonder Audio Driver HAT"""  "    2 chn input and 1 chn output" \
+                    """WM8960 Audio Driver HAT"""  "    2 chn input and 2 chn output" \
                     ""UNSET"" "    Unset audio driver hat")
     fi
 
@@ -1542,6 +1543,18 @@ do_sound_devices_select() {
         do_set_audio_machine
       fi
       audio_hat_type_string="hiwonder_rasadapter5b"
+    fi
+      #use wm8960 audio codec HAT
+    if [ "$FUN" == "WM8960 Audio Driver HAT" ]; then
+      if [ "$CUR" != "UNSET" ]; then
+        do_unset_audio_hat
+        CUR="$FUN"
+      fi
+      if [ -e /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf ]; then
+        mv /lib/modprobe.d/blacklist-hobot-codec-wm8960.conf /lib/modprobe.d/blacklist-hobot-codec-wm8960.disable
+        do_set_audio_machine
+      fi
+      audio_hat_type_string="wm8960"
     fi
     #if user didn't unset audio hat
     if [ "$FUN" != "UNSET" ]; then
