@@ -1500,6 +1500,9 @@ do_sound_devices_select() {
   elif [ $RET -eq 0 ]; then
     #get board type (string)
     board_type_string=$(get_rdk_type_string)
+    if [ $board_type_string == "x5_md" ]; then
+      board_type_string="x5_rdk"
+    fi
     audio_hat_type_string=""
     #if board is unsupport,return
     if [ $board_type_string == "null" ]; then
