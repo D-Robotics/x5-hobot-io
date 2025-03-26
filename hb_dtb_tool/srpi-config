@@ -1481,7 +1481,10 @@ do_sound_devices_select() {
     audio_options=("UNSET")
 
     if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
-      audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput"  ""UNSET"" "    Unset audio driver hat")
+      audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput" \
+                    """Hiwonder Audio Driver HAT"""  "    2 chn input and 1 chn output" \
+                    """WM8960 Audio Driver HAT"""  "    2 chn input and 2 chn output" \
+                    ""UNSET"" "    Unset audio driver hat")
     fi
 
 
@@ -1532,6 +1535,7 @@ do_sound_devices_select() {
       #enable driver auto load at boot (ONLY CODEC DRIVER!)
       if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
         mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
+        do_set_audio_machine
       fi
       audio_hat_type_string="es7210_es8156"
     fi
@@ -1543,8 +1547,33 @@ do_sound_devices_select() {
       fi
       if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
         mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
+        do_set_audio_machine
       fi
       audio_hat_type_string="es7210_es8156"
+    fi
+    #use hiwonder audio codec HAT
+    if [ "$FUN" == "Hiwonder Audio Driver HAT" ]; then
+      if [ "$CUR" != "UNSET" ]; then
+        do_unset_audio_hat
+        CUR="$FUN"
+      fi
+      if [ -e /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf ]; then
+        mv /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf /lib/modprobe.d/blacklist-hobot-codec-hiwonder.disable
+        do_set_audio_machine
+      fi
+      audio_hat_type_string="hiwonder_rasadapter5b"
+    fi
+      #use wm8960 audio codec HAT
+    if [ "$FUN" == "WM8960 Audio Driver HAT" ]; then
+      if [ "$CUR" != "UNSET" ]; then
+        do_unset_audio_hat
+        CUR="$FUN"
+      fi
+      if [ -e /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf ]; then
+        mv /lib/modprobe.d/blacklist-hobot-codec-wm8960.conf /lib/modprobe.d/blacklist-hobot-codec-wm8960.disable
+        do_set_audio_machine
+      fi
+      audio_hat_type_string="wm8960"
     fi
     #if user didn't unset audio hat
     if [ "$FUN" != "UNSET" ]; then
@@ -1592,6 +1621,13 @@ do_sound_devices_select() {
     ASK_TO_REBOOT=1
   fi
 }
+
+# set audio machine, unset is in do unset_audio_hat()
+do_set_audio_machine(){
+  mv /lib/modprobe.d/blacklist-hobot-audio-machine.conf /lib/modprobe.d/blacklist-hobot-audio-machine.disable
+
+}
+
 do_unset_audio_hat(){
   #remove auto load module step 1
   directory="/lib/modprobe.d"
