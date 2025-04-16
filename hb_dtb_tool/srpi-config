@@ -27,6 +27,9 @@ get_rdk_type_string() {
     ;; 
   "0x501")
     echo "x5_md"
+    ;;
+  "0x502")
+    echo "x5_md"
     ;; 
   *)
     echo "null"
