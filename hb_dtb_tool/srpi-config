@@ -1709,91 +1709,11 @@ do_imu_devices_select(){
   fi
 }
 
-do_v4l2_select(){
-  v4l2configfile="/etc/init.d/v4l2_config"
-
-  if [ "$INTERACTIVE" = "True" ]; then
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "HBN" --menu "Set camera interface" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-      "HBN" "" "V4L2 sif-isp-vse" ""  "V4L2 vse alone" "" 3>&1 1>&2 2>&3)
-    RET=$?
-  else
-    FUN=$1
-    RET=0
-  fi
-
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
-    if [ "${FUN}" = "HBN" ]; then
-      sed -i 's/^enable=.*/enable=0/' "$v4l2configfile"
-    elif [ "${FUN}" = "V4L2 sif-isp-vse" ]; then
-      sed -i 's/^enable=.*/enable=1/' "$v4l2configfile"
-      sed -i 's/^scene=.*/scene=22/' "$v4l2configfile"
-    elif [ "${FUN}" = "V4L2 vse alone" ]; then
-      sed -i 's/^enable=.*/enable=1/' "$v4l2configfile"
-      sed -i 's/^scene=.*/scene=5/' "$v4l2configfile"
-    fi
-  fi
-
-  if [ "$INTERACTIVE" = "True" ]; then
-    whiptail --msgbox "The camera interface is set to ${FUN}" 20 60 1
-  fi
-}
-
-do_v4l2_cam0(){
-  dtfilehead="dtoverlay_cam0_"
-
-  if [ "$INTERACTIVE" = "True" ]; then
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "UNSET" --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-      "UNSET" "" "OV5647" "" "IMX219" "" "IMX477" "" 3>&1 1>&2 2>&3)
-    RET=$?
-  else
-    FUN=$1
-    RET=0
-  fi
-
-  if [ $RET -eq 1 ]; then
-    return 0
-  elif [ $RET -eq 0 ]; then
-    if [ "${FUN}" = "UNSET" ]; then
-      if grep -q "^dtoverlay="$dtfilehead"" $CONFIG; then
-        # if exist set data del it
-        sed -i "/^dtoverlay="$dtfilehead".*/d" $CONFIG
-      fi
-      return 0
-    else
-      sed -i 's/^enable=.*/enable=1/' "$v4l2configfile"
-      sed -i 's/^scene=.*/scene=22/' "$v4l2configfile"
-    fi
-
-    if [ "$FUN" == "OV5647" ]; then
-      dtfile=""$dtfilehead"ov5647"
-    elif [ "$FUN" == "IMX219" ]; then
-      dtfile=""$dtfilehead"imx219"
-    elif [ "$FUN" == "IMX477" ]; then
-      dtfile=""$dtfilehead"imx477"
-    fi
-
-    # check is there right dtoverlay config in config.txt
-    if grep -q "dtoverlay="$dtfilehead"" $CONFIG; then
-      # if wrong , sed with right
-      sed -i "s|dtoverlay="$dtfilehead".*|dtoverlay="$dtfile"|" $CONFIG
-    else
-      # if not exist, echo it
-      echo "dtoverlay="$dtfile"" >> $CONFIG
-    fi
-  fi
-
-  if [ "$INTERACTIVE" = "True" ]; then
-    whiptail --msgbox "The cam0 sensor is set to ${FUN}" 20 60 1
-  fi
-}
-
 do_v4l2_cam1(){
   dtfilehead="dtoverlay_cam1_"
 
   if [ "$INTERACTIVE" = "True" ]; then
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "UNSET" --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(whiptail --title "CAM1 SET" --default-item "UNSET" --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
       "UNSET" "" "OV5647" "" "IMX219" "" "IMX477" "" 3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -1810,9 +1730,6 @@ do_v4l2_cam1(){
         sed -i "/^dtoverlay="$dtfilehead".*/d" $CONFIG
       fi
       return 0
-    else
-      sed -i 's/^enable=.*/enable=1/' "$v4l2configfile"
-      sed -i 's/^scene=.*/scene=22/' "$v4l2configfile"
     fi
     
     if [ "$FUN" == "OV5647" ]; then
@@ -1838,11 +1755,128 @@ do_v4l2_cam1(){
   fi
 }
 
+do_v4l2_cam0(){
+  dtfilehead="dtoverlay_cam0_"
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    FUN=$(whiptail --title "CAM0 SET" --default-item "UNSET" --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "UNSET" "" "OV5647" "" "IMX219" "" "IMX477" "" 3>&1 1>&2 2>&3)
+    RET=$?
+  else
+    FUN=$1
+    RET=0
+  fi
+
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    if [ "${FUN}" = "UNSET" ]; then
+      if grep -q "^dtoverlay="$dtfilehead"" $CONFIG; then
+        # if exist set data del it
+        sed -i "/^dtoverlay="$dtfilehead".*/d" $CONFIG
+      fi
+      return 0
+    fi
+
+    if [ "$FUN" == "OV5647" ]; then
+      dtfile=""$dtfilehead"ov5647"
+    elif [ "$FUN" == "IMX219" ]; then
+      dtfile=""$dtfilehead"imx219"
+    elif [ "$FUN" == "IMX477" ]; then
+      dtfile=""$dtfilehead"imx477"
+    fi
+
+    # check is there right dtoverlay config in config.txt
+    if grep -q "dtoverlay="$dtfilehead"" $CONFIG; then
+      # if wrong , sed with right
+      sed -i "s|dtoverlay="$dtfilehead".*|dtoverlay="$dtfile"|" $CONFIG
+    else
+      # if not exist, echo it
+      echo "dtoverlay="$dtfile"" >> $CONFIG
+    fi
+  fi
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    whiptail --msgbox "The cam0 sensor is set to ${FUN}" 20 60 1
+  fi
+
+  do_v4l2_cam1
+
+}
+
+do_v4l2_select(){
+  v4l2configfile="/etc/init.d/v4l2_config"
+  dtfilehead0="dtoverlay_cam0_"
+  dtfilehead1="dtoverlay_cam1_"
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "HBN" --menu "Set camera interface" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "HBN" "" "V4L2 sif-isp-vse" ""  "V4L2 vse alone" "" 3>&1 1>&2 2>&3)
+    RET=$?
+  else
+    FUN=$1
+    RET=0
+  fi
+
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    if [ "${FUN}" = "HBN" ]; then
+      if grep -q "v4l2_enable" $CONFIG; then
+        # if exist set data del it
+        sed -i "/v4l2_enable/d" $CONFIG
+      fi
+      if grep -q "v4l2_scene=" $CONFIG; then
+        # if exist set data del it
+        sed -i "/^v4l2_scene=.*/d" $CONFIG
+      fi
+    elif [ "${FUN}" = "V4L2 sif-isp-vse" ]; then
+      if ! grep -q "v4l2_enable" $CONFIG; then
+        echo "v4l2_enable" >> $CONFIG
+      fi
+      if grep -q "v4l2_scene=" $CONFIG; then
+        # if wrong , sed with right
+        sed -i 's/^v4l2_scene=.*/v4l2_scene=22/' $CONFIG
+      else
+        # if not exist, echo it
+        echo "v4l2_scene=22" >> $CONFIG
+      fi
+    elif [ "${FUN}" = "V4L2 vse alone" ]; then
+      if ! grep -q "v4l2_enable" $CONFIG; then
+        echo "v4l2_enable" >> $CONFIG
+      fi
+      if grep -q "v4l2_scene=" $CONFIG; then
+        # if wrong , sed with right
+        sed -i 's/^v4l2_scene=.*/v4l2_scene=5/' $CONFIG
+      else
+        # if not exist, echo it
+        echo "v4l2_scene=5" >> $CONFIG
+      fi
+    fi
+  fi
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    whiptail --msgbox "The camera interface is set to ${FUN}" 20 60 1
+  fi
+
+  if [ "${FUN}" = "V4L2 sif-isp-vse" ]; then
+    do_v4l2_cam0
+  else
+    if grep -q "^dtoverlay="$dtfilehead0"" $CONFIG; then
+      # if exist set data del it
+      sed -i "/^dtoverlay="$dtfilehead0".*/d" $CONFIG
+    fi
+    if grep -q "^dtoverlay="$dtfilehead1"" $CONFIG; then
+      # if exist set data del it
+      sed -i "/^dtoverlay="$dtfilehead1".*/d" $CONFIG
+    fi
+  fi
+  ASK_TO_REBOOT=1
+}
+
 do_V4L2_menu() {
   FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "V4L2 Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
     "I1 V4L2" "Enable/disable V4L2 interface for camera" \
-    "I2 CAM0" "CAM0 sensor choose" \
-    "I3 CAM1" "CAM1 sensor choose" \
     3>&1 1>&2 2>&3)
   RET=$?
   if [ $RET -eq 1 ]; then
@@ -1850,8 +1884,6 @@ do_V4L2_menu() {
   elif [ $RET -eq 0 ]; then
     case "$FUN" in
       I1\ *) do_v4l2_select ;;
-      I2\ *) do_v4l2_cam0 ;;
-      I3\ *) do_v4l2_cam1 ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
