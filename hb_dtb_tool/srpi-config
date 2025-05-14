@@ -31,6 +31,9 @@ get_rdk_type_string() {
   "0x502")
     echo "x5_md"
     ;; 
+  "0x503")
+    echo "x5_md"
+    ;;
   *)
     echo "null"
     exit -1
@@ -892,6 +895,12 @@ do_peripheral() {
         "0x501")
           config="/etc/hobot.conf/x5rdk.conf"
           ;;
+        "0x502")
+          config="/etc/hobot.conf/x5rdk.conf"
+          ;;
+        "0x503")
+          config="/etc/hobot.conf/x5rdk.conf"
+          ;;
       *)
           echo "Unsupport board type!!"
           exit -1
@@ -925,6 +934,14 @@ do_peripheral() {
           "0x501")
               config="/etc/hobot.conf/x5rdk.conf"
               dtb_name="x5-md-v0p1.dtb"
+              ;;
+          "0x502")
+              config="/etc/hobot.conf/x5rdk.conf"
+              dtb_name="x5-md-v0p2.dtb"
+              ;;
+          "0x503")
+              config="/etc/hobot.conf/x5rdk.conf"
+              dtb_name="x5-md-v0p2.dtb"
               ;;
           *)
               echo "Unsupport board type!!"
