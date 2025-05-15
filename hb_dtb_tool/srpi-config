@@ -25,12 +25,30 @@ get_rdk_type_string() {
   "0x302")
     echo "x5_rdk"
     ;; 
+  "0x501")
+    echo "x5_md"
+    ;;
+  "0x502")
+    echo "x5_md"
+    ;; 
+  "0x503")
+    echo "x5_md"
+    ;;
   *)
     echo "null"
     exit -1
   ;;
   esac
 
+}
+
+is_rdkmd() {
+  board_type_string=$(get_rdk_type_string)
+
+    if [ $board_type_string == "x5_md" ]; then
+      return 0
+    fi
+    return 1
 }
 
 is_installed() {
@@ -873,7 +891,16 @@ do_peripheral() {
           ;; 
        "0x302")
           config="/etc/hobot.conf/x5rdk.conf"
-          ;; 
+          ;;
+        "0x501")
+          config="/etc/hobot.conf/x5rdk.conf"
+          ;;
+        "0x502")
+          config="/etc/hobot.conf/x5rdk.conf"
+          ;;
+        "0x503")
+          config="/etc/hobot.conf/x5rdk.conf"
+          ;;
       *)
           echo "Unsupport board type!!"
           exit -1
@@ -903,6 +930,18 @@ do_peripheral() {
           "0x302")
               config="/etc/hobot.conf/x5rdk.conf"
               dtb_name="x5-rdk-v1p0.dtb"
+              ;;
+          "0x501")
+              config="/etc/hobot.conf/x5rdk.conf"
+              dtb_name="x5-md-v0p1.dtb"
+              ;;
+          "0x502")
+              config="/etc/hobot.conf/x5rdk.conf"
+              dtb_name="x5-md-v0p2.dtb"
+              ;;
+          "0x503")
+              config="/etc/hobot.conf/x5rdk.conf"
+              dtb_name="x5-md-v0p2.dtb"
               ;;
           *)
               echo "Unsupport board type!!"
@@ -1461,8 +1500,11 @@ do_sound_devices_select() {
     board_type_string=$(get_rdk_type_string)
     audio_options=("UNSET")
 
-    if [ $board_type_string == "x5_rdk" ]; then
-      audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput"  ""UNSET"" "    Unset audio driver hat")
+    if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
+      audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput" \
+                    """Hiwonder Audio Driver HAT"""  "    2 chn input and 1 chn output" \
+                    """WM8960 Audio Driver HAT"""  "    2 chn input and 2 chn output" \
+                    ""UNSET"" "    Unset audio driver hat")
     fi
 
 
@@ -1478,6 +1520,9 @@ do_sound_devices_select() {
   elif [ $RET -eq 0 ]; then
     #get board type (string)
     board_type_string=$(get_rdk_type_string)
+    if [ $board_type_string == "x5_md" ]; then
+      board_type_string="x5_rdk"
+    fi
     audio_hat_type_string=""
     #if board is unsupport,return
     if [ $board_type_string == "null" ]; then
@@ -1513,6 +1558,7 @@ do_sound_devices_select() {
       #enable driver auto load at boot (ONLY CODEC DRIVER!)
       if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
         mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
+        do_set_audio_machine
       fi
       audio_hat_type_string="es7210_es8156"
     fi
@@ -1524,8 +1570,33 @@ do_sound_devices_select() {
       fi
       if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
         mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
+        do_set_audio_machine
       fi
       audio_hat_type_string="es7210_es8156"
+    fi
+    #use hiwonder audio codec HAT
+    if [ "$FUN" == "Hiwonder Audio Driver HAT" ]; then
+      if [ "$CUR" != "UNSET" ]; then
+        do_unset_audio_hat
+        CUR="$FUN"
+      fi
+      if [ -e /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf ]; then
+        mv /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf /lib/modprobe.d/blacklist-hobot-codec-hiwonder.disable
+        do_set_audio_machine
+      fi
+      audio_hat_type_string="hiwonder_rasadapter5b"
+    fi
+      #use wm8960 audio codec HAT
+    if [ "$FUN" == "WM8960 Audio Driver HAT" ]; then
+      if [ "$CUR" != "UNSET" ]; then
+        do_unset_audio_hat
+        CUR="$FUN"
+      fi
+      if [ -e /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf ]; then
+        mv /lib/modprobe.d/blacklist-hobot-codec-wm8960.conf /lib/modprobe.d/blacklist-hobot-codec-wm8960.disable
+        do_set_audio_machine
+      fi
+      audio_hat_type_string="wm8960"
     fi
     #if user didn't unset audio hat
     if [ "$FUN" != "UNSET" ]; then
@@ -1573,6 +1644,13 @@ do_sound_devices_select() {
     ASK_TO_REBOOT=1
   fi
 }
+
+# set audio machine, unset is in do unset_audio_hat()
+do_set_audio_machine(){
+  mv /lib/modprobe.d/blacklist-hobot-audio-machine.conf /lib/modprobe.d/blacklist-hobot-audio-machine.disable
+
+}
+
 do_unset_audio_hat(){
   #remove auto load module step 1
   directory="/lib/modprobe.d"
@@ -1605,7 +1683,7 @@ do_imu_devices_select(){
     board_type_string=$(get_rdk_type_string)
     dtfilehead="dtoverlay_imu_"
     # audio_options=("UNSET")
-    if [ $board_type_string == "x5_rdk" ]; then
+    if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
       # imu_options=(""SPI-Interface" "" "I2C-Interface" """)
       imu_options=("""SPI-Interface"""  "    Use SPI1 as the data interface for IMU."  ""I2C-Interface"" "    Use I2C5 as the data interface for IMU." ""UNSET"" "    Unset IMU driver hat")
     fi
@@ -1648,6 +1726,186 @@ do_imu_devices_select(){
   fi
 }
 
+do_v4l2_cam1(){
+  dtfilehead="dtoverlay_cam1_"
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    FUN=$(whiptail --title "CAM1 SET" --default-item "UNSET" --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "UNSET" "" "OV5647" "" "IMX219" "" "IMX477" "" 3>&1 1>&2 2>&3)
+    RET=$?
+  else
+    FUN=$1
+    RET=0
+  fi
+
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    if [ "${FUN}" = "UNSET" ]; then
+      if grep -q "^dtoverlay="$dtfilehead"" $CONFIG; then
+        # if exist set data del it
+        sed -i "/^dtoverlay="$dtfilehead".*/d" $CONFIG
+      fi
+      return 0
+    fi
+    
+    if [ "$FUN" == "OV5647" ]; then
+      dtfile=""$dtfilehead"ov5647"
+    elif [ "$FUN" == "IMX219" ]; then
+      dtfile=""$dtfilehead"imx219"
+    elif [ "$FUN" == "IMX477" ]; then
+      dtfile=""$dtfilehead"imx477"
+    fi
+
+    # check is there right dtoverlay config in config.txt
+    if grep -q "dtoverlay="$dtfilehead"" $CONFIG; then
+      # if wrong , sed with right
+      sed -i "s|dtoverlay="$dtfilehead".*|dtoverlay="$dtfile"|" $CONFIG
+    else
+      # if not exist, echo it
+      echo "dtoverlay="$dtfile"" >> $CONFIG
+    fi
+  fi
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    whiptail --msgbox "The cam0 sensor is set to ${FUN}" 20 60 1
+  fi
+}
+
+do_v4l2_cam0(){
+  dtfilehead="dtoverlay_cam0_"
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    FUN=$(whiptail --title "CAM0 SET" --default-item "UNSET" --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "UNSET" "" "OV5647" "" "IMX219" "" "IMX477" "" 3>&1 1>&2 2>&3)
+    RET=$?
+  else
+    FUN=$1
+    RET=0
+  fi
+
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    if [ "${FUN}" = "UNSET" ]; then
+      if grep -q "^dtoverlay="$dtfilehead"" $CONFIG; then
+        # if exist set data del it
+        sed -i "/^dtoverlay="$dtfilehead".*/d" $CONFIG
+      fi
+      return 0
+    fi
+
+    if [ "$FUN" == "OV5647" ]; then
+      dtfile=""$dtfilehead"ov5647"
+    elif [ "$FUN" == "IMX219" ]; then
+      dtfile=""$dtfilehead"imx219"
+    elif [ "$FUN" == "IMX477" ]; then
+      dtfile=""$dtfilehead"imx477"
+    fi
+
+    # check is there right dtoverlay config in config.txt
+    if grep -q "dtoverlay="$dtfilehead"" $CONFIG; then
+      # if wrong , sed with right
+      sed -i "s|dtoverlay="$dtfilehead".*|dtoverlay="$dtfile"|" $CONFIG
+    else
+      # if not exist, echo it
+      echo "dtoverlay="$dtfile"" >> $CONFIG
+    fi
+  fi
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    whiptail --msgbox "The cam0 sensor is set to ${FUN}" 20 60 1
+  fi
+
+  do_v4l2_cam1
+
+}
+
+do_v4l2_select(){
+  v4l2configfile="/etc/init.d/v4l2_config"
+  dtfilehead0="dtoverlay_cam0_"
+  dtfilehead1="dtoverlay_cam1_"
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "HBN" --menu "Set camera interface" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "HBN" "" "V4L2 sif-isp-vse" ""  "V4L2 vse alone" "" 3>&1 1>&2 2>&3)
+    RET=$?
+  else
+    FUN=$1
+    RET=0
+  fi
+
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    if [ "${FUN}" = "HBN" ]; then
+      if grep -q "v4l2_enable" $CONFIG; then
+        # if exist set data del it
+        sed -i "/v4l2_enable/d" $CONFIG
+      fi
+      if grep -q "v4l2_scene=" $CONFIG; then
+        # if exist set data del it
+        sed -i "/^v4l2_scene=.*/d" $CONFIG
+      fi
+    elif [ "${FUN}" = "V4L2 sif-isp-vse" ]; then
+      if ! grep -q "v4l2_enable" $CONFIG; then
+        echo "v4l2_enable" >> $CONFIG
+      fi
+      if grep -q "v4l2_scene=" $CONFIG; then
+        # if wrong , sed with right
+        sed -i 's/^v4l2_scene=.*/v4l2_scene=22/' $CONFIG
+      else
+        # if not exist, echo it
+        echo "v4l2_scene=22" >> $CONFIG
+      fi
+    elif [ "${FUN}" = "V4L2 vse alone" ]; then
+      if ! grep -q "v4l2_enable" $CONFIG; then
+        echo "v4l2_enable" >> $CONFIG
+      fi
+      if grep -q "v4l2_scene=" $CONFIG; then
+        # if wrong , sed with right
+        sed -i 's/^v4l2_scene=.*/v4l2_scene=5/' $CONFIG
+      else
+        # if not exist, echo it
+        echo "v4l2_scene=5" >> $CONFIG
+      fi
+    fi
+  fi
+
+  if [ "$INTERACTIVE" = "True" ]; then
+    whiptail --msgbox "The camera interface is set to ${FUN}" 20 60 1
+  fi
+
+  if [ "${FUN}" = "V4L2 sif-isp-vse" ]; then
+    do_v4l2_cam0
+  else
+    if grep -q "^dtoverlay="$dtfilehead0"" $CONFIG; then
+      # if exist set data del it
+      sed -i "/^dtoverlay="$dtfilehead0".*/d" $CONFIG
+    fi
+    if grep -q "^dtoverlay="$dtfilehead1"" $CONFIG; then
+      # if exist set data del it
+      sed -i "/^dtoverlay="$dtfilehead1".*/d" $CONFIG
+    fi
+  fi
+  ASK_TO_REBOOT=1
+}
+
+do_V4L2_menu() {
+  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "V4L2 Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    "I1 V4L2" "Enable/disable V4L2 interface for camera" \
+    3>&1 1>&2 2>&3)
+  RET=$?
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    case "$FUN" in
+      I1\ *) do_v4l2_select ;;
+      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
+    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+  fi
+}
+
 do_interface_menu() {
     FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Interfacing Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
       "I1 SSH" "Enable/disable remote command line access using SSH" \
@@ -1656,6 +1914,7 @@ do_interface_menu() {
       "I4 Configure Wi-Fi antenna" "Configure Wi-Fi antennas to use onboard or external antenna" \
       "I5 Audio" "Configure audio peripheral functions" \
       "I6 IMU" "Configure IMU peripheral functions" \
+      "I7 V4L2" "Configure V4L2 functions" \
       3>&1 1>&2 2>&3)
   RET=$?
   if [ $RET -eq 1 ]; then
@@ -1668,6 +1927,7 @@ do_interface_menu() {
       I4\ *) do_wifi_antenna ;;
       I5\ *) do_sound_devices_select ;;
       I6\ *) do_imu_devices_select ;;
+      I7\ *) do_V4L2_menu ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi

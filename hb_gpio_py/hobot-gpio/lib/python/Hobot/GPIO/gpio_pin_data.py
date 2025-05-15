@@ -264,6 +264,9 @@ ALL_BOARD_DATA = [
     {'board_name' : 'X3PI_V2_1', 'pin_info' : X3_PI_V2_1_PIN, 'board_id' : 0x804},
     {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x301},
     {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x302},
+    {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x501},
+    {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x502},
+    {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x503},
     {'board_name' : 'EVB_X5', 'pin_info' : EVB_X5_PIN, 'board_id' : 0x201}, #HOBOT_X5_EVB_LP4_1_A_ID
     {'board_name' : 'EVB_X5', 'pin_info' : EVB_X5_PIN, 'board_id' : 0x202}, #HOBOT_X5_EVB_LP4_1_B_ID
     {'board_name' : 'EVB_X5', 'pin_info' : EVB_X5_PIN, 'board_id' : 0x203}, #HOBOT_X5_EVB_LP4_V1P2_ID
