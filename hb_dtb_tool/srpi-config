@@ -1792,6 +1792,7 @@ do_v4l2_cam0(){
         # if exist set data del it
         sed -i "/^dtoverlay="$dtfilehead".*/d" $CONFIG
       fi
+      do_v4l2_cam1
       return 0
     fi
 
