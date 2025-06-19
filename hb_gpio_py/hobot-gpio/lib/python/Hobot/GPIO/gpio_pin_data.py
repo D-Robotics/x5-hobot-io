@@ -23,6 +23,7 @@ HOBOT_PI = 'HOBOT_PI'
 SYSFS_GPIO = "/sys/class/gpio"
 SYSFS_PLATFORM_PATH = '/sys/devices/platform/'
 SYSFS_BOARDID_PATH = '/sys/class/socinfo/board_id'
+SYSFS_SOCNAME_PATH = '/sys/class/socinfo/soc_name'
 HOBOT_PI_PATTERN = 'hobot,x3'
 
 # [0]- GPIO chip sysfs directory
@@ -255,13 +256,16 @@ EVB_X5_PIN = [
     ["soc/32080000.dsp_apb/32150000.gpio", 424, 40, 21, 'I2S1_DO', 'I2S1_SDOUT', None, None],
 ]
 
-ALL_BOARD_DATA = [
+ALL_BOARD_DATA_X3 = [
     {'board_name' : 'X3SDBV3', 'pin_info' : SDBV3_PIN, 'board_id' : 0x304},
     {'board_name' : 'X3SDB', 'pin_info' : SDB_PIN, 'board_id' : 0x404},
     {'board_name' : 'X3PI', 'pin_info' : X3_PI_PIN, 'board_id' : 0x504},
     {'board_name' : 'X3PI', 'pin_info' : X3_PI_PIN, 'board_id' : 0x604},
     {'board_name' : 'X3CM', 'pin_info' : X3_CM_PIN, 'board_id' : 0xb04},
     {'board_name' : 'X3PI_V2_1', 'pin_info' : X3_PI_V2_1_PIN, 'board_id' : 0x804},
+]
+
+ALL_BOARD_DATA_X5 = [
     {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x301},
     {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x302},
     {'board_name' : 'RDK_X5', 'pin_info' : RDK_X5_PIN, 'board_id' : 0x501},
@@ -301,7 +305,13 @@ def get_all_pin_data():
         sboard_id = "0x" + f.read()
         iboard_id = int(sboard_id,16)
         board_id = iboard_id & 0xfff
-    for board_data in ALL_BOARD_DATA:
+    with open(SYSFS_SOCNAME_PATH, 'r') as f:
+        soc_name = f.read().strip()
+    if 'x5' in soc_name.lower():
+        board_list = ALL_BOARD_DATA_X5
+    else:
+        board_list = ALL_BOARD_DATA_X3
+    for board_data in board_list:
         if board_data['board_id'] == board_id:
             pin_data = copy.deepcopy(board_data['pin_info'])
             model = board_data['board_name']
