@@ -642,15 +642,26 @@ do_drm_display_chose_gpu() {
 do_update_miniboot()
 {
   DEFAULT=--defaultno
+  DO_DOWNLOAD=0
+
   if [ "$INTERACTIVE" = True ]; then
     whiptail --yesno "Would you like update the minimal boot image in nand flash?\n\nCaution: Abnormal interruptions are not allowed during the upgrade process!" $DEFAULT 20 60 2
-    RET=$?
+    [ $? -eq 0 ] || return
   fi
-  if [ $? -eq 0 ]; then
-    if is_installed hobot-miniboot || apt update || apt-get install -y hobot-miniboot; then
-      rdk-miniboot-update
-    fi
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Do you want to download the latest hobot-miniboot from the internet?\n\nPlease ensure the network connection is stable before continuing." $DEFAULT 20 60 2
+    [ $? -eq 0 ] && DO_DOWNLOAD=1
   fi
+
+  if [ "$DO_DOWNLOAD" = 1 ] || ! is_installed hobot-miniboot; then
+    echo "Attempting to install hobot-miniboot..."
+    apt update;
+    apt-get install -y hobot-miniboot; 
+  fi
+
+  echo "Starting rdk-miniboot-update..."
+  rdk-miniboot-update
 }
 
 get_vnc_resolution() {
