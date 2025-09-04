@@ -666,13 +666,14 @@ update_lcd_config() {
 do_lcd_choice() {
   if [ "$INTERACTIVE" = True ]; then
     RES=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
-      "1" "2.8inch DSI LCD" \
-      "2" "3.4inch DSI LCD (C)" \
-      "3" "4.3inch DSI LCD" \
-      "4" "7inch DSI LCD (C)" \
-      "5" "7.9inch DSI LCD" \
-      "6" "8inch DSI LCD (C)" \
-      "7" "10.1inch DSI LCD (C)" \
+      "1" "UNSET(HDMI)" \
+      "2" "2.8inch DSI LCD" \
+      "3" "3.4inch DSI LCD (C)" \
+      "4" "4.3inch DSI LCD" \
+      "5" "7inch DSI LCD (C)" \
+      "6" "7.9inch DSI LCD" \
+      "7" "8inch DSI LCD (C)" \
+      "8" "10.1inch DSI LCD (C)" \
       3>&1 1>&2 2>&3)
   else
     RES=""
@@ -681,24 +682,33 @@ do_lcd_choice() {
   fi
   if [ $? -eq 0 ]; then
     if [ "$RES" = "1" ] ; then
+      if [ -e /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf ]; then
+          mv /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf.disable
+      fi
+      if [ -e /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf.disable ]; then
+          mv /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf.disable /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf
+      fi
+      sed -i "/^dtoverlay=dsi-waveshare-panel-overlay-/d" "${CONFIG}"
+      BSTRING="HDMI"
+    elif [ "$RES" = "2" ] ; then
       update_lcd_config "2_8_inch"
       BSTRING="2.8inch DSI LCD"
-    elif [ "$RES" = "2" ] ; then
+    elif [ "$RES" = "3" ] ; then
       update_lcd_config "3_4_inch"
       BSTRING="3.4inch DSI LCD (C)"
-    elif [ "$RES" = "3" ] ; then
+    elif [ "$RES" = "4" ] ; then
       update_lcd_config "4_3_inch"
       BSTRING="4.3inch DSI LCD"
-    elif [ "$RES" = "4" ] ; then
+    elif [ "$RES" = "5" ] ; then
       update_lcd_config "7_0_inchC"
       BSTRING="7inch DSI LCD (C)"
-    elif [ "$RES" = "5" ] ; then
+    elif [ "$RES" = "6" ] ; then
       update_lcd_config "7_9_inch"
       BSTRING="7.9inch DSI LCD"
-    elif [ "$RES" = "6" ] ; then
+    elif [ "$RES" = "7" ] ; then
       update_lcd_config "8_0_inch"
       BSTRING="8inch DSI LCD (C)"
-    elif [ "$RES" = "7" ] ; then
+    elif [ "$RES" = "8" ] ; then
       update_lcd_config "10_1_inch"
       BSTRING="10.1inch DSI LCD (C)"
     fi
