@@ -579,7 +579,7 @@ do_browser() {
   fi
 }
 
-do_drm_display_chose() {
+do_drm_display_choice() {
   if [ "$INTERACTIVE" = True ]; then
     RES=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "1" "DSI" \
@@ -615,7 +615,7 @@ do_drm_display_chose() {
   fi
 }
 
-do_drm_display_chose_gpu() {
+do_drm_display_choice_gpu() {
   if [ "$INTERACTIVE" = True ]; then
     RES=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "1" "CPU" \
@@ -637,6 +637,70 @@ do_drm_display_chose_gpu() {
           mv /etc/X11/xorg.conf.d/2-dr-accel.conf.disable /etc/X11/xorg.conf.d/2-dr-accel.conf
       fi
       BSTRING="GPU"
+    fi
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "Default display set to $BSTRING" 20 60 1
+      ASK_TO_REBOOT=1
+    fi
+  fi
+}
+
+update_lcd_config() {
+    local lcd_size="$1"
+
+    [ -e /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf ] && \
+        mv -f /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf.disable
+
+    [ -e /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf.disable ] && \
+        mv -f /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf.disable /etc/X11/xorg.conf.d/xorg_hdmi_ignore.conf
+
+    if [ -f "${CONFIG}" ]; then
+        if grep -q "^dtoverlay=dsi-waveshare-panel-overlay-" "${CONFIG}"; then
+            sed -i "s|^dtoverlay=dsi-waveshare-panel-overlay-.*|dtoverlay=dsi-waveshare-panel-overlay-${lcd_size}|" "${CONFIG}"
+        else
+            echo "dtoverlay=dsi-waveshare-panel-overlay-${lcd_size}" >> "${CONFIG}"
+        fi
+    fi
+}
+
+do_lcd_choice() {
+  if [ "$INTERACTIVE" = True ]; then
+    RES=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+      "1" "2.8inch DSI LCD" \
+      "2" "3.4inch DSI LCD (C)" \
+      "3" "4.3inch DSI LCD" \
+      "4" "7inch DSI LCD (C)" \
+      "5" "7.9inch DSI LCD" \
+      "6" "8inch DSI LCD (C)" \
+      "7" "10.1inch DSI LCD (C)" \
+      3>&1 1>&2 2>&3)
+  else
+    RES=""
+    BROWSER=$1
+    true
+  fi
+  if [ $? -eq 0 ]; then
+    if [ "$RES" = "1" ] ; then
+      update_lcd_config "2_8_inch"
+      BSTRING="2.8inch DSI LCD"
+    elif [ "$RES" = "2" ] ; then
+      update_lcd_config "3_4_inch"
+      BSTRING="3.4inch DSI LCD (C)"
+    elif [ "$RES" = "3" ] ; then
+      update_lcd_config "4_3_inch"
+      BSTRING="4.3inch DSI LCD"
+    elif [ "$RES" = "4" ] ; then
+      update_lcd_config "7_0_inchC"
+      BSTRING="7inch DSI LCD (C)"
+    elif [ "$RES" = "5" ] ; then
+      update_lcd_config "7_9_inch"
+      BSTRING="7.9inch DSI LCD"
+    elif [ "$RES" = "6" ] ; then
+      update_lcd_config "8_0_inch"
+      BSTRING="8inch DSI LCD (C)"
+    elif [ "$RES" = "7" ] ; then
+      update_lcd_config "10_1_inch"
+      BSTRING="10.1inch DSI LCD (C)"
     fi
     if [ "$INTERACTIVE" = True ]; then
       whiptail --msgbox "Default display set to $BSTRING" 20 60 1
@@ -1518,8 +1582,9 @@ do_system_menu() {
 
 do_display_menu() {
   FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-    "D1 Dsiplay Chose" " DSI or HDMI" \
-    "D2 Dsiplay Chose" " CPU or GPU" \
+    "D1 Dsiplay Choice" " DSI or HDMI" \
+    "D2 Dsiplay Choice" " CPU or GPU" \
+    "D3 MIPI LCD Choice" " waveshare panel choice" \
     3>&1 1>&2 2>&3)
 
   RET=$?
@@ -1527,8 +1592,9 @@ do_display_menu() {
     return 0
   elif [ $RET -eq 0 ]; then
     case "$FUN" in
-      D1\ *) do_drm_display_chose ;;
-      D2\ *) do_drm_display_chose_gpu ;;
+      D1\ *) do_drm_display_choice ;;
+      D2\ *) do_drm_display_choice_gpu ;;
+      D3\ *) do_lcd_choice ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
