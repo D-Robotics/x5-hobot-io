@@ -949,6 +949,18 @@ apply_status() {
   return $(fdtput -t s ${dtb_name} ${peri} status ${status} 2> /dev/null)
 }
 
+declare -A rdk_x5_conflict_peris=(
+  [serial3]="i2c5"
+  [i2c5]="serial3"
+  [i2c0]="pwm2"
+  [pwm2]="i2c0"
+  [spi2]="pwm0,pwm1"
+  [pwm0]="spi2"
+  [pwm1]="spi2"
+  [i2c1]="pwm3"
+  [pwm3]="i2c1"
+)
+
 peri_ops() {
   local dtb_name=$1
   local peri=$2
@@ -957,6 +969,11 @@ peri_ops() {
   local string=()
   local somep="false"
   local cperis=
+  local conflicts
+  local conflict_list=""
+
+  board_type_string=$(get_rdk_type_string)
+
   if [ "x${status}" == x"okay" ];then
     options=("dis")
   else
@@ -979,6 +996,21 @@ peri_ops() {
   else
     string=("")
   fi
+
+  if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
+    if [ "$options" == "en" ] && [ -n "${rdk_x5_conflict_peris[$peri]}" ]; then
+      conflicts=${rdk_x5_conflict_peris[$peri]}
+      for cperi in ${conflicts//,/ }; do
+        if [ "x${peri_status[$cperi]}" == "xokay" ]; then
+          conflict_list="$conflict_list $cperi"
+        fi
+      done
+      if [ -n "$conflict_list" ]; then
+        string="$string\nEnabling $peri will disable:${conflict_list}"
+      fi
+    fi
+  fi
+
   whiptail --title "Your select" \
     --yesno "Are you sure want to ${options}able $peri? \
     \n${string}" \
@@ -997,6 +1029,17 @@ peri_ops() {
         fi
       fi
     done
+
+    if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
+      if [ "$options" == "en" ] && [ -n "${rdk_x5_conflict_peris[$peri]}" ]; then
+        for cperi in ${rdk_x5_conflict_peris[$peri]//,/ }; do
+          if [ "x${peri_status[$cperi]}" == "xokay" ]; then
+            apply_status "${dtb_name}" "$cperi" "disabled"
+          fi
+        done
+      fi
+    fi
+
   fi
   return $ret
 }
