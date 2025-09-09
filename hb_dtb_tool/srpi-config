@@ -1961,7 +1961,7 @@ do_v4l2_cam1(){
   fi
 
   if [ "$INTERACTIVE" = "True" ]; then
-    whiptail --msgbox "The cam0 sensor is set to ${FUN}" 20 60 1
+    whiptail --msgbox "The cam1 sensor is set to ${FUN}" 20 60 1
   fi
 }
 
