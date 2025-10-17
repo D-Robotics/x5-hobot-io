@@ -1836,7 +1836,7 @@ do_imu_devices_select(){
     # audio_options=("UNSET")
     if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
       # imu_options=(""SPI-Interface" "" "I2C-Interface" """)
-      imu_options=("""SPI-Interface"""  "    Use SPI1 as the data interface for IMU."  ""I2C-Interface"" "    Use I2C5 as the data interface for IMU." ""UNSET"" "    Unset IMU driver hat")
+      imu_options=("""BMI088-SPI-Interface"""  "    Use SPI1 as the data interface for IMU."  ""BMI088-I2C-Interface"" "    Use I2C5 as the data interface for IMU." ""ICM42788-I2C-Interface"" "    Use I2C4 or I2C6 as the data interface for Stereo Camera IMU." ""UNSET"" "    Unset IMU driver hat")
     fi
     FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "Onboard" --menu "Set IMU bmi088" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
       "${imu_options[@]}"  3>&1 1>&2 2>&3)
@@ -1856,13 +1856,16 @@ do_imu_devices_select(){
         # if exist set data del it
         sed -i "/^dtoverlay="$dtfilehead".*/d" $CONFIG
       fi
+      ASK_TO_REBOOT=1
       return 0
     fi
 
-    if [ "$FUN" == "SPI-Interface" ]; then
-      dtfile=""$dtfilehead"spi1_"$board_type_string""
-    elif [ "$FUN" == "I2C-Interface" ]; then
-      dtfile=""$dtfilehead"i2c5_"$board_type_string""
+    if [ "$FUN" == "BMI088-SPI-Interface" ]; then
+      dtfile=""$dtfilehead"bmi088_spi1_"$board_type_string""
+    elif [ "$FUN" == "BMI088-I2C-Interface" ]; then
+      dtfile=""$dtfilehead"bmi088_i2c5_"$board_type_string""
+    elif [ "$FUN" == "ICM42788-I2C-Interface" ]; then
+      dtfile=""$dtfilehead"icm42688_i2c4_6_"$board_type_string""
     fi
     # check is there right dtoverlay config in config.txt
     if grep -q "dtoverlay="$dtfilehead"" $CONFIG; then
@@ -1873,6 +1876,7 @@ do_imu_devices_select(){
       echo "dtoverlay="$dtfile"" >> $CONFIG
     fi
 
+    ASK_TO_REBOOT=1
     return 0
   fi
 }
