@@ -1786,6 +1786,8 @@ do_sound_devices_select() {
       fi
       #stop pulseaudio,sometimes it gives some weird errors
       kill -9 $(pidof pulseaudio) > /dev/null 2>&1
+      #add auto load module
+      cp  /etc/hobot_audio_config/99_hobot_audio_module.conf /etc/modules-load.d/
     fi
     #set the current audio board type to UNSET step 1
     echo "$FUN" > /etc/hobot_audio_config/cur_audio_hat
@@ -1813,7 +1815,7 @@ do_unset_audio_hat(){
     fi
   done
   #remove auto load module step 2
-  rm -f /etc/modules-load.d/01_hobot_audio_module.conf
+  rm -f /etc/modules-load.d/99_hobot_audio_module.conf
   #remove alsa config step 3
   rm -f /var/lib/alsa/asound.state
   #delete dtoverlay setting step 1
