@@ -2153,6 +2153,69 @@ do_advanced_menu() {
   fi
 }
 
+do_isp_imx219() {
+  local FOV_SELECTED
+  local TUNING_PATH="/usr/hobot/lib/sensor"
+  local TARGETS=("640x480" "1632x1232" "1920x1080" "3264x2464")
+
+  if [ "$INTERACTIVE" = True ]; then
+    FOV_SELECTED=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" \
+      --menu "Select FOV Profile" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+      "1" "FOV 79.3°" \
+      "2" "FOV 120°" \
+      3>&1 1>&2 2>&3)
+  else
+    FOV_SELECTED="$1"
+  fi
+
+  [ $? -ne 0 ] && return 1
+
+  case "$FOV_SELECTED" in
+    "1")
+      local PROFILE="fov79"
+      ;;
+    "2")
+      local PROFILE="fov120"
+      ;;
+    *)
+      echo "Invalid selection"
+      return 1
+      ;;
+  esac
+
+  for res in "${TARGETS[@]}"; do
+    local src="${TUNING_PATH}/imx219_${PROFILE}_${res}_tuning.json"
+    local dst="${TUNING_PATH}/imx219_${res}_tuning.json"
+    if [ -f "$src" ]; then
+      cp "$src" "$dst"
+    else
+      echo "Warning: Missing $src"
+    fi
+  done
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "ISP effects set to: $PROFILE" 20 60 1
+  fi
+
+  return 0
+}
+
+do_sensor_isp() {
+  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    "A1 IMX219" "Switch ISP effects for 79.3° / 120° FOV" \
+    3>&1 1>&2 2>&3)
+
+  RET=$?
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    case "$FUN" in
+      A1\ *) do_isp_imx219 ;;
+      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
+    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+  fi
+}
+
 do_proxy_menu() {
   FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Network Proxy Settings" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
     "P1 All" "Set the same proxy for all schemes" \
@@ -2209,6 +2272,7 @@ if [ "$INTERACTIVE" = True ]; then
       "4 Performance Options" "Configure performance settings" \
       "5 Localisation Options" "Configure language and regional settings" \
       "6 Advanced Options" "Configure advanced settings" \
+      "7 Sensor Profiles" "Configure ISP settings for different FOVs" \
       "8 Update" "Update this tool to the latest version" \
       "9 About srpi-config" "Information about this configuration tool" \
       3>&1 1>&2 2>&3)
@@ -2223,6 +2287,7 @@ if [ "$INTERACTIVE" = True ]; then
         4\ *) do_performance_menu ;;
         5\ *) do_internationalisation_menu ;;
         6\ *) do_advanced_menu ;;
+        7\ *) do_sensor_isp ;;
         8\ *) do_update ;;
         9\ *) do_about ;;
         *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
