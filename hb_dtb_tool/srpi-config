@@ -674,6 +674,7 @@ do_lcd_choice() {
       "6" "7.9inch DSI LCD" \
       "7" "8inch DSI LCD (C)" \
       "8" "10.1inch DSI LCD (C)" \
+      "9" "11.9inch DSI LCD" \
       3>&1 1>&2 2>&3)
   else
     RES=""
@@ -711,6 +712,9 @@ do_lcd_choice() {
     elif [ "$RES" = "8" ] ; then
       update_lcd_config "10_1_inch"
       BSTRING="10.1inch DSI LCD (C)"
+    elif [ "$RES" = "9" ] ; then
+      update_lcd_config "11_9_inch"
+      BSTRING="11.9inch DSI LCD"
     fi
     if [ "$INTERACTIVE" = True ]; then
       whiptail --msgbox "Default display set to $BSTRING" 20 60 1
