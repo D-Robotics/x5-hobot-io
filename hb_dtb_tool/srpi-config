@@ -13,51 +13,55 @@ if [ -z "$USER" ] || [ "$USER" = "root" ]; then
   USER=$(getent passwd | awk -F: '$3 == "1000" {print $1}')
 fi
 
+SYSFS_BOARDID_PATH="/sys/class/socinfo/board_id"
+SYSFS_SOCNAME_PATH="/sys/class/socinfo/soc_name"
+SYSFS_SOMNAME_PATH="/sys/class/socinfo/som_name"
+
 get_rdk_type_string() {
-  board_id=$(cat /sys/class/socinfo/board_id)
-  board_type=$((0x$board_id & 0xfff))
-  hex_btype=$(printf "0x%x" $board_type)
+  local soc_name=""
+  local board_id=""
+  local rdk_type="unknown"
 
-  case $hex_btype in
-  "0x301")
-    echo "x5_rdk"
-    ;; 
-  "0x302")
-    echo "x5_rdk"
-    ;; 
-  "0x501")
-    echo "x5_md"
-    ;;
-  "0x502")
-    echo "x5_md"
-    ;; 
-  "0x503")
-    echo "x5_md"
-    ;;
-  "0x504")
-    echo "x5_md"
-    ;;
-  "0x505")
-    echo "x5_md"
-    ;;
-  "0x506")
-    echo "x5_md"
-    ;;
-  *)
-    echo "null"
-    exit -1
-  ;;
-  esac
+  if [ -f "${SYSFS_SOCNAME_PATH}" ]; then
+    soc_name=$(cat "${SYSFS_SOCNAME_PATH}" 2>/dev/null | tr -d '[:space:]')
+  elif [ -f "${SYSFS_SOMNAME_PATH}" ]; then
+    soc_name=$(cat "${SYSFS_SOMNAME_PATH}" 2>/dev/null | tr -d '[:space:]')
+  fi
+  soc_name=${soc_name:-""}
 
-}
+  if [ -f "${SYSFS_BOARDID_PATH}" ]; then
+    board_id=$(cat "${SYSFS_BOARDID_PATH}" 2>/dev/null | tr -d '[:space:]')
+  fi
+  board_id=${board_id:-""}
 
-is_rdkmd() {
-  board_type_string=$(get_rdk_type_string)
-
-    if [ $board_type_string == "x5_md" ]; then
-      return 0
+  if echo "$soc_name" | grep -qi "x5"; then
+    local prefix=""
+    local version_num="0"
+    
+    if [[ "$board_id" == 30* ]]; then
+      prefix="x5_rdk"
+      version_num=$(echo "$board_id" | grep -o "30[0-9]" | grep -o "[0-9]$" || echo "0")
+    elif [[ "$board_id" == 50* ]]; then
+      prefix="x5_md"
+      version_num=$(echo "$board_id" | grep -o "50[0-9]" | grep -o "[0-9]$" || echo "0")
     fi
-    return 1
+
+    if [ -n "$prefix" ]; then
+      rdk_type="${prefix}_v${version_num}"
+    else
+      rdk_type="x5_unknown"
+    fi
+
+  elif [[ "$soc_name" =~ ^[568b]$ ]]; then
+    case "$soc_name" in
+      "5") rdk_type="x3_rdk_v1"   ;; 
+      "6") rdk_type="x3_rdk_v1_2" ;;  
+      "8") rdk_type="x3_rdk_v2"   ;;
+      "b") rdk_type="x3_md_v1"    ;;
+    esac
+  fi
+
+  echo "$rdk_type"
 }
 
 is_installed() {
@@ -1001,7 +1005,7 @@ peri_ops() {
     string=("")
   fi
 
-  if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
+  if [[ "$board_type_string" == *x5* ]]; then
     if [ "$options" == "en" ] && [ -n "${rdk_x5_conflict_peris[$peri]}" ]; then
       conflicts=${rdk_x5_conflict_peris[$peri]}
       for cperi in ${conflicts//,/ }; do
@@ -1034,7 +1038,7 @@ peri_ops() {
       fi
     done
 
-    if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
+    if [[ "$board_type_string" == *x5* ]]; then
       if [ "$options" == "en" ] && [ -n "${rdk_x5_conflict_peris[$peri]}" ]; then
         for cperi in ${rdk_x5_conflict_peris[$peri]//,/ }; do
           if [ "x${peri_status[$cperi]}" == "xokay" ]; then
@@ -1049,106 +1053,71 @@ peri_ops() {
 }
 
 do_peripheral() {
-  board_id=$(cat /sys/class/socinfo/board_id)
-  board_type=$((0x$board_id & 0xfff))
-  hex_btype=$(printf "0x%x" $board_type)
-
-  rootsource=$(findmnt -n -o SOURCE / | sed 's~\[.*\]~~')
-  rootdevice=$(echo $rootsource | sed -e "s/^\/dev\///")
-  rootpartnum=${rootdevice##mmc*p}
-  if [ $rootpartnum -gt 2 ];then
-      case $hex_btype in
-       "0x301")
-          config="/etc/hobot.conf/x5rdk.conf"
-          ;; 
-       "0x302")
-          config="/etc/hobot.conf/x5rdk.conf"
-          ;;
-        "0x501")
-          config="/etc/hobot.conf/x5rdk.conf"
-          ;;
-        "0x502")
-          config="/etc/hobot.conf/x5rdk.conf"
-          ;;
-        "0x503")
-          config="/etc/hobot.conf/x5rdk.conf"
-          ;;
-        "0x504")
-          config="/etc/hobot.conf/x5rdk.conf"
-          ;;
-        "0x505")
-          config="/etc/hobot.conf/x5rdk.conf"
-          ;;
-        "0x506")
-          config="/etc/hobot.conf/x5rdk.conf"
-          ;;
-      *)
-          echo "Unsupport board type!!"
-          exit -1
-          ;;
-      esac
-      partnum=`parted /dev/mmcblk0 print -sm | grep ":boot" | awk -F ':' '{print $1}'`
-      partdev="/dev/mmcblk0p${partnum}"
-      bootfile="/tmp/boot.img"
-      dd if=${partdev} of=${bootfile} bs=1M count=10 > /dev/null
-      ret=$?
-      if [[ $ret -ne 0 ]] || [[ ! -f ${bootfile} ]];then
-          echo "dd is failed or ${bootfile} is not exist!"
-          exit -1
-      fi
-      dtb_name=`hb_dtb_tool -i ${bootfile} -b ${board_type} -g|grep dtb_name |awk '{print $2}'`
-      if [ ! -n $dtb_name ];then
-      echo "hb_dtb_tool get ${board_type} failed!"
+  board_type_string=$(get_rdk_type_string)
+  case $board_type_string in
+  x5*)
+    config="/etc/hobot.conf/x5rdk.conf"
+    ;; 
+  x3_rdk_v1*)
+    config="/etc/hobot.conf/x3pi.conf"
+    ;;
+  x3_rdk_v2*)
+    config="/etc/hobot.conf/rdkx3_v2_1.conf"
+    ;;
+  x3_md*)
+    config="/etc/hobot.conf/x3cm.conf"
+    ;;
+  *)
+    echo "Unsupport board type for config!!"
+    exit -1
+    ;;
+  esac
+  case $board_type_string in
+  "x5_rdk_v1")
+      dtb_name="x5-rdk.dtb"
+      ;;
+  "x5_rdk_v2")
+      dtb_name="x5-rdk-v1p0.dtb"
+      ;;
+  "x5_md_v1")
+      dtb_name="x5-md-v0p1.dtb"
+      ;;
+  "x5_md_v2")
+      dtb_name="x5-md-v0p2.dtb"
+      ;;
+  "x5_md_v3")
+      dtb_name="x5-md-v0p2.dtb"
+      ;;
+  "x5_md_v4")
+      dtb_name="x5-md-v0p2.dtb"
+      ;;
+  "x5_md_v5")
+      dtb_name="x5-md-v0p2.dtb"
+      ;;
+  "x5_md_v6")
+      dtb_name="x5-md-v1p2.dtb"
+      ;;
+  "x3_rdk_v1*")
+      dtb_name="hobot-x3-pi.dtb"
+      ;;
+  "x3_rdk_v2")
+      dtb_name="hobot-x3-pi_v2_1.dtb"
+      ;;
+  "x3_md_v1")
+      dtb_name="hobot-x3-cm.dtb"
+      ;;
+  *)
+      echo "Unsupport board type for dtb_name!!"
       exit -1
-      fi
-  elif [ $rootpartnum -eq 1 ] || [ $rootpartnum -eq 2 ];then
-      if [ -d "/boot/hobot" ];then
-          case $hex_btype in
-          "0x301")
-              config="/etc/hobot.conf/x5rdk.conf"
-              dtb_name="x5-rdk.dtb"
-              ;;
-          "0x302")
-              config="/etc/hobot.conf/x5rdk.conf"
-              dtb_name="x5-rdk-v1p0.dtb"
-              ;;
-          "0x501")
-              config="/etc/hobot.conf/x5rdk.conf"
-              dtb_name="x5-md-v0p1.dtb"
-              ;;
-          "0x502")
-              config="/etc/hobot.conf/x5rdk.conf"
-              dtb_name="x5-md-v0p2.dtb"
-              ;;
-          "0x503")
-              config="/etc/hobot.conf/x5rdk.conf"
-              dtb_name="x5-md-v0p2.dtb"
-              ;;
-          "0x504")
-              config="/etc/hobot.conf/x5rdk.conf"
-              dtb_name="x5-md-v0p2.dtb"
-              ;;
-          "0x505")
-              config="/etc/hobot.conf/x5rdk.conf"
-              dtb_name="x5-md-v0p2.dtb"
-              ;;
-          "0x506")
-              config="/etc/hobot.conf/x5rdk.conf"
-              dtb_name="x5-md-v1p2.dtb"
-              ;;
-          *)
-              echo "Unsupport board type!!"
-              exit -1
-              ;;
-          esac
-          if [ -f "/boot/hobot/${dtb_name}" ];then
-              cp "/boot/hobot/${dtb_name}" ${dtb_name}
-          else
-              echo "Dtb file not exist!!"
-              exit -1
-          fi
-      fi
+      ;;
+  esac
+  if [ -f "/boot/hobot/${dtb_name}" ];then
+      cp "/boot/hobot/${dtb_name}" ${dtb_name}
+  else
+      echo "Dtb file not exist!!"
+      exit -1
   fi
+
   if [ -z $dtb_name ];then
       echo "No dtb file find!!"
       exit -1
@@ -1180,29 +1149,11 @@ do_peripheral() {
       fi
   done
 
-  if [ $rootpartnum -gt 2 ];then
-      if [ x${apply_state} == x"true" ];then
-          hb_dtb_tool -i ${bootfile} -b ${board_type} -s $dtb_name
-          ret=$?
-          if [ $ret -ne 0 ];then
-              echo "hb_dtb_tool -s is failed!"
-              exit -1
-          fi
-          dd if=${bootfile} of=${partdev}  > /dev/null
-          ret=$?
-          if [ $ret -ne 0 ];then
-              echo "dd is failed!"
-              exit -1
-          fi
-          ASK_TO_REBOOT=1
-          sync
-      fi
-  elif [ $rootpartnum -eq 1 ] || [ $rootpartnum -eq 2 ];then
-      if [ x${apply_state} == x"true" ];then
-          cp ${dtb_name} "/boot/hobot/${dtb_name}"
-          ASK_TO_REBOOT=1
-      fi
+  if [ x${apply_state} == x"true" ];then
+      cp ${dtb_name} "/boot/hobot/${dtb_name}"
+      ASK_TO_REBOOT=1
   fi
+
   rm -rf $dtb_name ${bootfile}
 }
 
@@ -1384,7 +1335,7 @@ do_cpu_frequency_menu() {
   fi
 }
 
-get_total_memory()
+get_total_memory_x3()
 {
   total_mem=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
 
@@ -1393,31 +1344,80 @@ get_total_memory()
   echo ${rounded_mem}
 }
 
-get_ion_cma_memory ()
+get_ion_memory_x3 ()
+{
+  if [ -e /proc/device-tree/reserved-memory/ion_cma/size ] ; then
+    ion_cma_size_hex=$(xxd -s 4 -l 4 -p /proc/device-tree/reserved-memory/ion_cma/size | tr -d " \t\n\r")
+    ion_cma_size_dec=$((16#${ion_cma_size_hex}))
+    ion_cma_size_mb=$((ion_cma_size_dec / (1024 * 1024)))
+    echo ${ion_cma_size_mb}"MB"
+  else
+    echo "672MB"
+  fi
+}
+
+do_config_ion_memory_x3 ()
+{
+  if [ "$INTERACTIVE" = True ]; then
+    CUR=$(get_ion_memory_x3)
+    if [ "$CUR" = "" ] ; then
+      CUR=672MB
+    fi
+    total_mem=$(get_total_memory_x3)
+    if [ ${total_mem} -ge 4 ]; then
+      FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item $CUR --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+        "512MB" "" "672MB" "" "768MB" "" "1024MB" "" "1280MB" "" "1536MB" "" "1664MB" "" "1700MB" "" "1900MB" "Only supported on 4GB memory models" 3>&1 1>&2 2>&3)
+    else
+       FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item $CUR --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+        "512MB" "" "672MB" "" "768MB" "" "1024MB" "" "1280MB" "" "1536MB" "" "1664MB" "" "1700MB" "" 3>&1 1>&2 2>&3)
+    fi
+    RET=$?
+  else
+    FUN=$1
+    RET=0
+  fi
+  if [ $RET -eq 1 ]; then
+    return 0
+  elif [ $RET -eq 0 ]; then
+    ion_cma_size_mb=$(echo ${FUN} | sed 's/MB//')
+    ion_cma_size_hex=$(printf "0x%x" "$((ion_cma_size_mb * 1024 * 1024))")
+    if grep -q "dtoverlay=ion_resize,size=" "${CONFIG}" || grep -q "#dtoverlay=ion_resize,size=" "${CONFIG}"; then
+      sed -i "s/\(dtoverlay=ion_resize,size=\|#dtoverlay=ion_resize,size=\).*/dtoverlay=ion_resize,size=${ion_cma_size_hex}/" "${CONFIG}"
+    else
+      echo "dtoverlay=ion_resize,size=${ion_cma_size_hex}" >> "${CONFIG}"
+    fi
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "The ion memory is set to ${FUN}" 20 60 1
+      ASK_TO_REBOOT=1
+    fi
+  fi
+}
+
+get_ion_cma_memory_x5 ()
 {
   ion_size=$(awk '/total size/ {print $5}' /sys/kernel/debug/ion/heaps/ion_cma)
   ion_size=$(( ion_size / (1024 * 1024) ))
   echo ${ion_size}"MB"
 }
 
-get_cma_reserved_memory ()
+get_cma_reserved_memory_x5 ()
 {
   ion_size=$(awk '/total size/ {print $5}' /sys/kernel/debug/ion/heaps/cma_reserved)
   ion_size=$(( ion_size / (1024 * 1024) ))
   echo ${ion_size}"MB"
 }
 
-get_carveout_memory ()
+get_carveout_memory_x5 ()
 {
   ion_size=$(awk '/total size/ {print $5}' /sys/kernel/debug/ion/heaps/carveout)
   ion_size=$(( ion_size / (1024 * 1024) ))
   echo ${ion_size}"MB"
 }
 
-do_config_ion_memory ()
+do_config_ion_memory_x5 ()
 {
   if [ "$INTERACTIVE" = True ]; then
-    CUR=$(get_ion_cma_memory)+$(get_cma_reserved_memory)+$(get_carveout_memory)
+    CUR=$(get_ion_cma_memory_x5)+$(get_cma_reserved_memory_x5)+$(get_carveout_memory_x5)
     if [ "$CUR" = "" ] ; then
       CUR=128MB+320MB+320MB
     fi
@@ -1464,6 +1464,23 @@ do_config_ion_memory ()
       ASK_TO_REBOOT=1
     fi
   fi
+}
+
+do_config_ion_memory() {
+  board_type_string=$(get_rdk_type_string)
+  
+  case "$board_type_string" in
+    x5*)
+      do_config_ion_memory_x5
+      ;;
+    x3*)
+      do_config_ion_memory_x3
+      ;;
+    *)
+      whiptail --msgbox "Unsupported board type: $board_type_string\nION memory configuration failed!" 12 60
+      return 1
+      ;;
+  esac
 }
 
 do_expand_rootfs() {
@@ -1638,12 +1655,21 @@ do_system_menu() {
 }
 
 do_display_menu() {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
-    "D1 Dsiplay Choice" " DSI or HDMI" \
-    "D2 Dsiplay Choice" " CPU or GPU" \
-    "D3 MIPI LCD Choice" " waveshare panel choice" \
-    3>&1 1>&2 2>&3)
-
+  board_type_string=$(get_rdk_type_string)
+  if [[ "$board_type_string" == *x5* ]]; then	
+    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "D1 Dsiplay Choice" " DSI or HDMI" \
+      "D2 Dsiplay Choice" " CPU or GPU" \
+      "D3 MIPI LCD Choice" " waveshare panel choice" \
+      3>&1 1>&2 2>&3)
+  elif [[ "$board_type_string" == *x3* ]]; then
+    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "D4 FB Console Resolution" "Set resolution for framebuffer console" \
+      3>&1 1>&2 2>&3)
+  else
+    whiptail --msgbox "Unsupported board type: $board_type_string\nDisplay configuration is not available!" 12 60
+    return 1
+  fi
   RET=$?
   if [ $RET -eq 1 ]; then
     return 0
@@ -1652,6 +1678,7 @@ do_display_menu() {
       D1\ *) do_drm_display_choice ;;
       D2\ *) do_drm_display_choice_gpu ;;
       D3\ *) do_lcd_choice ;;
+      D4\ *) do_fb_console_resolution ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
@@ -1692,18 +1719,26 @@ getMinibootUpdateVersion()
 }
 
 do_sound_devices_select() {
+  board_type_string=$(get_rdk_type_string)
   if [ "$INTERACTIVE" = True ]; then
     CUR=$(get_cur_audio_hat)
     board_type_string=$(get_rdk_type_string)
     audio_options=("UNSET")
 
-    if [ $board_type_string == "x5_rdk" ] || [ $board_type_string == "x5_md" ]; then
+    if [[ "$board_type_string" == *x5* ]]; then
       audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput" \
                     """Hiwonder Audio Driver HAT"""  "    2 chn input and 1 chn output" \
                     """WM8960 Audio Driver HAT"""  "    2 chn input and 2 chn output" \
                     ""UNSET"" "    Unset audio driver hat")
+    elif [[ "$board_type_string" == *x3_rdk_v1* ]]; then
+      audio_options=("""Audio Driver HAT V1"""  "    4 chn input and 2 chn ouput" \
+                    """Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput" \
+                    ""UNSET"" "    Unset audio driver hat")
+    elif [ $board_type_string == "x3_rdk_v2*" ] || [ $board_type_string == "x3_md*" ]; then
+      audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput" \
+                    """Hiwonder Audio Driver HAT"""  "    2 chn input and 1 chn output" \
+                    ""UNSET"" "    Unset audio driver hat")
     fi
-
 
     FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "$CUR" --menu "Select Sound Device" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
       "${audio_options[@]}" 3>&1 1>&2 2>&3)
@@ -1715,11 +1750,6 @@ do_sound_devices_select() {
   if [ $RET -eq 1 ]; then
     return 0
   elif [ $RET -eq 0 ]; then
-    #get board type (string)
-    board_type_string=$(get_rdk_type_string)
-    if [ $board_type_string == "x5_md" ]; then
-      board_type_string="x5_rdk"
-    fi
     audio_hat_type_string=""
     #if board is unsupport,return
     if [ $board_type_string == "null" ]; then
@@ -1727,21 +1757,25 @@ do_sound_devices_select() {
       return
     fi
     #if audio is es7210+es8156
-    if [ "$FUN" == "Audio Driver HAT V2" ]; then
+    if [ "$FUN" == "Audio Driver HAT V1" ] || [ "$FUN" == "Audio Driver HAT V2" ]; then
       if [ "$CUR" != "UNSET" ]; then
         do_unset_audio_hat
         CUR="$FUN"
       fi
       if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
         mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
-        do_set_audio_machine
       fi
-      grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-        echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa
-      grep -q "load-module module-alsa-source device=hw:0,1" /etc/pulse/default.pa || \
-        echo "load-module module-alsa-source device=hw:0,1" | tee -a /etc/pulse/default.pa
-      grep -q "set-default-source alsa_input.hw_0_1" /etc/pulse/default.pa || \
-        echo "set-default-source alsa_input.hw_0_1" | tee -a /etc/pulse/default.pa
+      if [[ "$board_type_string" == *x5* ]]; then
+        grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
+          echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
+        grep -q "load-module module-alsa-source device=hw:0,1" /etc/pulse/default.pa || \
+          echo "load-module module-alsa-source device=hw:0,1" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
+        grep -q "set-default-source alsa_input.hw_0_1" /etc/pulse/default.pa || \
+          echo "set-default-source alsa_input.hw_0_1" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
+      elif [[ "$board_type_string" == *x3* ]]; then
+	      grep -q "load-module module-alsa-source device=hw:0,1" /etc/pulse/default.pa || \
+	          echo "load-module module-alsa-source device=hw:0,1" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
+      fi
       audio_hat_type_string="es7210_es8156"
     fi
     #use hiwonder audio codec HAT
@@ -1754,10 +1788,12 @@ do_sound_devices_select() {
         mv /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf /lib/modprobe.d/blacklist-hobot-codec-hiwonder.disable
         do_set_audio_machine
       fi
-      grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-        echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa
-      grep -q "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-        echo "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa
+      if [[ "$board_type_string" == *x5* ]]; then
+	      grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
+	        echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
+	      grep -q "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
+	        echo "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
+      fi
       audio_hat_type_string="hiwonder_rasadapter5b"
     fi
       #use wm8960 audio codec HAT
@@ -1770,10 +1806,12 @@ do_sound_devices_select() {
         mv /lib/modprobe.d/blacklist-hobot-codec-wm8960.conf /lib/modprobe.d/blacklist-hobot-codec-wm8960.disable
         do_set_audio_machine
       fi
-      grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-        echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa
-      grep -q "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-        echo "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa
+      if [[ "$board_type_string" == *x5* ]]; then
+	      grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
+	        echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
+	      grep -q "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
+	        echo "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
+      fi
       audio_hat_type_string="wm8960"
     fi
     #if user didn't unset audio hat
@@ -1799,14 +1837,17 @@ do_sound_devices_select() {
     if [ "$FUN" == "UNSET" ]; then
       do_unset_audio_hat
     fi
+    if [[ "$board_type_string" == *x3* ]]; then
+	    # check miniboot version
+	    cur_miniboot_version=$(strings /dev/mtd0 | grep -E "U-Boot 2018.09.*\(" | head -n 1)
+	    getMinibootUpdateVersion
+	    latest_miniboot_version=$(strings $MINIBOOT_UPDATE_IMAGE | grep -E "U-Boot 2018.09.*\(" | head -n 1)
+	    if [ "$cur_miniboot_version" != "$latest_miniboot_version" ];then
+	      whiptail --msgbox "Your miniboot version is: $cur_miniboot_version\n\nThe latest miniboot version is: $latest_miniboot_version \n\nMaybe you need to update miniboot to enable sound card.\n\nEnter 1 System Options -> S7 Update Miniboot to upgrade miniboot." $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT
+	    fi
+    fi
     ASK_TO_REBOOT=1
   fi
-}
-
-# set audio machine, unset is in do unset_audio_hat()
-do_set_audio_machine(){
-  mv /lib/modprobe.d/blacklist-hobot-audio-machine.conf /lib/modprobe.d/blacklist-hobot-audio-machine.disable
-
 }
 
 do_unset_audio_hat(){
@@ -2069,6 +2110,8 @@ do_V4L2_menu() {
 }
 
 do_interface_menu() {
+  board_type_string=$(get_rdk_type_string)
+  if [[ "$board_type_string" == *x5* ]]; then	
     FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Interfacing Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
       "I1 SSH" "Enable/disable remote command line access using SSH" \
       "I2 VNC" "Enable/disable graphical remote desktop access" \
@@ -2078,6 +2121,15 @@ do_interface_menu() {
       "I6 IMU" "Configure IMU peripheral functions" \
       "I7 V4L2" "Configure V4L2 functions" \
       3>&1 1>&2 2>&3)
+  elif [[ "$board_type_string" == *x3* ]]; then
+    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Interfacing Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      "I1 SSH" "Enable/disable remote command line access using SSH" \
+      "I2 VNC" "Enable/disable graphical remote desktop access" \
+      "I3 Peripheral bus config" "Enable/disable peripheral bus(spi,i2c,serial,i2s,etc.)" \
+      "I4 Configure Wi-Fi antenna" "Configure Wi-Fi antennas to use onboard or external antenna" \
+      "I5 Audio" "Configure audio peripheral functions" \
+      3>&1 1>&2 2>&3)
+  fi
   RET=$?
   if [ $RET -eq 1 ]; then
     return 0
@@ -2269,17 +2321,30 @@ if [ "$INTERACTIVE" = True ]; then
   done
   backtitle=$(cat /proc/device-tree/model | tr -d '\0')
   while true; do
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --backtitle "${backtitle}" --menu "Setup Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Finish --ok-button Select \
-      "1 System Options" "Configure system settings" \
-      "2 Display Options" "Configure display settings" \
-      "3 Interface Options" "Configure connections to peripherals" \
-      "4 Performance Options" "Configure performance settings" \
-      "5 Localisation Options" "Configure language and regional settings" \
-      "6 Advanced Options" "Configure advanced settings" \
-      "7 Sensor Profiles" "Configure ISP settings for different FOVs" \
-      "8 Update" "Update this tool to the latest version" \
-      "9 About srpi-config" "Information about this configuration tool" \
-      3>&1 1>&2 2>&3)
+    if [[ "$board_type_string" == *x5* ]]; then
+	    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --backtitle "${backtitle}" --menu "Setup Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Finish --ok-button Select \
+	      "1 System Options" "Configure system settings" \
+	      "2 Display Options" "Configure display settings" \
+	      "3 Interface Options" "Configure connections to peripherals" \
+	      "4 Performance Options" "Configure performance settings" \
+	      "5 Localisation Options" "Configure language and regional settings" \
+	      "6 Advanced Options" "Configure advanced settings" \
+	      "7 Sensor Profiles" "Configure ISP settings for different FOVs" \
+	      "8 Update" "Update this tool to the latest version" \
+	      "9 About srpi-config" "Information about this configuration tool" \
+	      3>&1 1>&2 2>&3)
+    else
+        FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --backtitle "${backtitle}" --menu "Setup Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Finish --ok-button Select \
+	      "1 System Options" "Configure system settings" \
+	      "2 Display Options" "Configure display settings" \
+	      "3 Interface Options" "Configure connections to peripherals" \
+	      "4 Performance Options" "Configure performance settings" \
+	      "5 Localisation Options" "Configure language and regional settings" \
+	      "6 Advanced Options" "Configure advanced settings" \
+	      "8 Update" "Update this tool to the latest version" \
+	      "9 About srpi-config" "Information about this configuration tool" \
+	      3>&1 1>&2 2>&3)
+    fi
     RET=$?
     if [ $RET -eq 1 ]; then
       do_finish
