@@ -1,0 +1,4 @@
+debian/usr/hobot/
+hb_gpioinfo/gpioinfo.o
+hb_gpioinfo/hb_gpioinfo
+hb_gpioinfo/tools-common.o
