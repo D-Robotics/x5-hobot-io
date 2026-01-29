@@ -1764,6 +1764,7 @@ do_sound_devices_select() {
       fi
       if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
         mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
+        do_set_audio_machine
       fi
       if [[ "$board_type_string" == *x5* ]]; then
         grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
@@ -1816,8 +1817,16 @@ do_sound_devices_select() {
     fi
     #if user didn't unset audio hat
     if [ "$FUN" != "UNSET" ]; then
+      dtb_board_type="x5_rdk"
+      if [[ "$board_type_string" == *x3_rdk_v1* ]]; then
+        dtb_board_type="rdk_v1_x"
+      elif [[ "$board_type_string" == *x3_rdk_v2* ]]; then
+        tb_board_type="rdk_v2"
+      elif [[ "$board_type_string" == *x3_md* ]]; then
+        dtb_board_type="rdk_md"
+      fi
       #splice dtbo name,from option and board
-      dtboname="audio_"$audio_hat_type_string"_"$board_type_string""
+      dtboname="audio_"$audio_hat_type_string"_"$dtb_board_type""
       #for debug,it will be commented out
       #echo $dtboname
       #set dtoverlay name to config.txt
@@ -1848,6 +1857,12 @@ do_sound_devices_select() {
     fi
     ASK_TO_REBOOT=1
   fi
+}
+
+# set audio machine, unset is in do unset_audio_hat()
+do_set_audio_machine(){
+  mv /lib/modprobe.d/blacklist-hobot-audio-common.conf /lib/modprobe.d/blacklist-hobot-audio-common.disable
+
 }
 
 do_unset_audio_hat(){
