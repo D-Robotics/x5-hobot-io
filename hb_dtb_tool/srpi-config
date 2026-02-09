@@ -64,6 +64,16 @@ get_rdk_type_string() {
   echo "$rdk_type"
 }
 
+is_rdkmd() {
+  board_type_string=$(get_rdk_type_string)
+
+  if [[ "$board_type_string" == *md* ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 is_installed() {
   if [ "$(dpkg -l "$1" 2> /dev/null | tail -n 1 | cut -d ' ' -f 1)" != "ii" ]; then
     return 1
