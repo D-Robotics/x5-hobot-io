@@ -21,16 +21,16 @@ get_rdk_type_string() {
   case $hex_btype in
   "0x301")
     echo "x5_rdk"
-    ;; 
+    ;;
   "0x302")
     echo "x5_rdk"
-    ;; 
+    ;;
   "0x501")
     echo "x5_md"
     ;;
   "0x502")
     echo "x5_md"
-    ;; 
+    ;;
   "0x503")
     echo "x5_md"
     ;;
@@ -85,19 +85,19 @@ calc_wt_size() {
 }
 
 do_about() {
-  whiptail --msgbox "\
+  dialog --keep-tite --msgbox "\
 This tool provides a straightforward way of doing initial
 configuration of the RDK. Although it can be run
 at any time, some of the options may have difficulties if
 you have heavily customised your installation.\
-" 20 70 1
+" 20 70
   return 0
 }
 
 do_change_pass() {
-  whiptail --msgbox "You will now be asked to enter a new password for the $USER user" 20 60 1
+  dialog --keep-tite --msgbox "You will now be asked to enter a new password for the $USER user" 20 60
   passwd $USER &&
-  whiptail --msgbox "Password changed successfully" 20 60 1
+  dialog --keep-tite --msgbox "Password changed successfully" 20 60
 }
 
 set_config_var() {
@@ -221,17 +221,17 @@ get_hostname() {
 
 do_hostname() {
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "\
+    dialog --keep-tite --msgbox "\
 Please note: RFCs mandate that a hostname's labels \
 may contain only the ASCII letters 'a' through 'z' (case-insensitive),
 the digits '0' through '9', and the hyphen.
 Hostname labels cannot begin or end with a hyphen.
 No other symbols, punctuation characters, or blank spaces are permitted.\
-" 20 70 1
+" 20 70
   fi
   CURRENT_HOSTNAME=$(get_hostname)
   if [ "$INTERACTIVE" = True ]; then
-    NEW_HOSTNAME=$(whiptail --inputbox "Please enter a hostname" 20 60 "$CURRENT_HOSTNAME" 3>&1 1>&2 2>&3)
+    NEW_HOSTNAME=$(dialog --keep-tite --inputbox "Please enter a hostname" 20 60 "$CURRENT_HOSTNAME" 3>&1 1>&2 2>&3)
   else
     NEW_HOSTNAME="$1"
     true
@@ -266,36 +266,36 @@ do_wifi_ssid_passphrase() {
 
     if [ -z "$IFACE" ]; then
       if [ "$INTERACTIVE" = True ]; then
-        whiptail --msgbox "No wireless interface found" 20 60
+        dialog --keep-tite --msgbox "No wireless interface found" 20 60
       fi
       return 1
     fi
 
     if ! wpa_cli -i "$IFACE" status > /dev/null 2>&1; then
       if [ "$INTERACTIVE" = True ]; then
-        whiptail --msgbox "Could not communicate with wpa_supplicant" 20 60
+        dialog --keep-tite --msgbox "Could not communicate with wpa_supplicant" 20 60
       fi
       return 1
     fi
   elif ! systemctl -q is-active NetworkManager; then
     if [ "$INTERACTIVE" = True ]; then
-        whiptail --msgbox "No supported network connection manager found" 20 60
+        dialog --keep-tite --msgbox "No supported network connection manager found" 20 60
       fi
       return 1
   fi
 
   SSID="$1"
   while [ -z "$SSID" ] && [ "$INTERACTIVE" = True ]; do
-    if ! SSID=$(whiptail --inputbox "Please enter SSID" 20 60 3>&1 1>&2 2>&3); then
+    if ! SSID=$(dialog --keep-tite --inputbox "Please enter SSID" 20 60 3>&1 1>&2 2>&3); then
       return 0
     elif [ -z "$SSID" ]; then
-      whiptail --msgbox "SSID cannot be empty. Please try again." 20 60
+      dialog --keep-tite --msgbox "SSID cannot be empty. Please try again." 20 60
     fi
   done
 
   PASSPHRASE="$2"
   while [ "$INTERACTIVE" = True ]; do
-    if ! PASSPHRASE=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 20 60 3>&1 1>&2 2>&3); then
+    if ! PASSPHRASE=$(dialog --keep-tite --insecure --passwordbox "Please enter passphrase. Leave it empty if none." 20 60 3>&1 1>&2 2>&3); then
       return 0
     else
       break
@@ -353,7 +353,7 @@ do_wifi_ssid_passphrase() {
     else
       wpa_cli -i "$IFACE" remove_network "$ID" > /dev/null 2>&1
       if [ "$INTERACTIVE" = True ]; then
-        whiptail --msgbox "Failed to set SSID or passphrase" 20 60
+        dialog --keep-tite --msgbox "Failed to set SSID or passphrase" 20 60
       fi
     fi
     wpa_cli -i "$IFACE" save_config > /dev/null 2>&1
@@ -375,7 +375,7 @@ do_wifi_ssid_passphrase() {
 
 do_boot_behaviour() {
   if [ "$INTERACTIVE" = True ]; then
-    BOOTOPT=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Boot Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+    BOOTOPT=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --menu "Boot Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "B1 Console" "Text console, requiring user to login" \
       "B2 Console Autologin" "Text console, automatically logged in as '$USER' user" \
       "B3 Desktop" "Desktop GUI, requiring user to login" \
@@ -394,12 +394,12 @@ do_boot_behaviour() {
         if [ -e /etc/init.d/lightdm ]; then
           systemctl --quiet set-default graphical.target
         else
-          whiptail --msgbox "Do 'sudo apt-get install lightdm' to allow configuration of boot to desktop" 20 60 2
+          dialog --keep-tite --msgbox "Do 'sudo apt-get install lightdm' to allow configuration of boot to desktop" 20 60
           return 1
         fi
         ;;
       *)
-        whiptail --msgbox "Programmer error, unrecognised boot option" 20 60 2
+        dialog --keep-tite --msgbox "Programmer error, unrecognised boot option" 20 60
         return 1
         ;;
     esac
@@ -447,11 +447,11 @@ do_fb_console_resolution() {
       original_lines+=("$line" "")
     done < "$modes_file"
 
-    chosen_resolution=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item \
-      "${options[$default_option_index]}" --menu "Set FB Console Resolution" $WT_HEIGHT $WT_WIDTH \
-      $WT_MENU_HEIGHT "${options[@]}" --cancel-button Back --ok-button Select 3>&1 1>&2 2>&3)
+    chosen_resolution=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --default-item \
+      "${options[$default_option_index]}" --cancel-label Back --ok-label Select --menu "Set FB Console Resolution" $WT_HEIGHT $WT_WIDTH \
+      $WT_MENU_HEIGHT "${options[@]}" 3>&1 1>&2 2>&3)
     RET=$?
-  else 
+  else
     chosen_resolution=$1
     RET=0
   fi
@@ -469,14 +469,14 @@ do_fb_console_resolution() {
 
       read -t 10 -p "Please enter 'yes' in 10 seconds to confirm your selection:   " confirm
       if [ "$confirm" = "yes" ]; then
-        whiptail --msgbox "Your resolution has been changed:  $chosen_resolution" $WT_HEIGHT $WT_WIDTH
+        dialog --keep-tite --msgbox "Your resolution has been changed:  $chosen_resolution" $WT_HEIGHT $WT_WIDTH
         set_config_var fb_console_width $(echo "$chosen_resolution" | sed 's/.*:\([0-9]\+\)x\([0-9]\+\).*/\1/') ${CONFIG}
         set_config_var fb_console_height $(echo "$chosen_resolution" | sed 's/.*:\([0-9]\+\)x\([0-9]\+\).*/\2/') ${CONFIG}
         set_config_var fb_console_refresh_rate $(echo "$chosen_resolution" | sed 's/.*-//') ${CONFIG}
       else
         #fall back
         echo "${original_lines[$default_option_index]}" > /sys/class/graphics/fb0/mode
-        whiptail --msgbox "Your resolution is restored" $WT_HEIGHT $WT_WIDTH
+        dialog --keep-tite --msgbox "Your resolution is restored" $WT_HEIGHT $WT_WIDTH
 
       fi
       if [ "$INTERACTIVE" = True ]; then
@@ -501,7 +501,7 @@ do_leds() {
   CURRENT=$(get_leds)
   if [ $CURRENT -eq -1 ] ; then
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "The LED behaviour cannot be changed on this model of RDK" 20 60 1
+      dialog --keep-tite --msgbox "The LED behaviour cannot be changed on this model of RDK" 20 60
     fi
     return 1
   fi
@@ -510,7 +510,7 @@ do_leds() {
     DEFAULT=
   fi
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --yesno "Would you like the power LED to flash with heartbeat?" $DEFAULT 20 60 2
+    dialog --keep-tite $DEFAULT --yesno "Would you like the power LED to flash with heartbeat?" 20 60
     RET=$?
   else
     RET=$1
@@ -530,7 +530,7 @@ do_leds() {
   fi
   echo $LEDSET | tee /sys/class/leds/ACT/trigger > /dev/null
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "The power LED will $STATUS" 20 60 1
+    dialog --keep-tite --msgbox "The power LED will $STATUS" 20 60
   fi
 }
 
@@ -541,7 +541,7 @@ get_browser() {
 
 do_browser() {
   if [ "$INTERACTIVE" = True ]; then
-    RES=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+    RES=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "1" "Chromium" \
       "2" "Firefox" \
       3>&1 1>&2 2>&3)
@@ -574,14 +574,14 @@ do_browser() {
       sudo -u $2 xdg-settings set default-web-browser $BROWSER.desktop
     fi
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "Default browser set to $BSTRING" 20 60 1
+      dialog --keep-tite --msgbox "Default browser set to $BSTRING" 20 60
     fi
   fi
 }
 
 do_drm_display_choice() {
   if [ "$INTERACTIVE" = True ]; then
-    RES=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+    RES=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "1" "DSI" \
       "2" "HDMI" \
       3>&1 1>&2 2>&3)
@@ -609,7 +609,7 @@ do_drm_display_choice() {
       BSTRING="HDMI"
     fi
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "Default display set to $BSTRING" 20 60 1
+      dialog --keep-tite --msgbox "Default display set to $BSTRING" 20 60
       ASK_TO_REBOOT=1
     fi
   fi
@@ -617,7 +617,7 @@ do_drm_display_choice() {
 
 do_drm_display_choice_gpu() {
   if [ "$INTERACTIVE" = True ]; then
-    RES=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+    RES=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "1" "CPU" \
       "2" "GPU" \
       3>&1 1>&2 2>&3)
@@ -639,7 +639,7 @@ do_drm_display_choice_gpu() {
       BSTRING="GPU"
     fi
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "Default display set to $BSTRING" 20 60 1
+      dialog --keep-tite --msgbox "Default display set to $BSTRING" 20 60
       ASK_TO_REBOOT=1
     fi
   fi
@@ -665,7 +665,7 @@ update_lcd_config() {
 
 do_lcd_choice() {
   if [ "$INTERACTIVE" = True ]; then
-    RES=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+    RES=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --menu "Select Browser" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "1" "UNSET(HDMI)" \
       "2" "2.8inch DSI LCD" \
       "3" "3.4inch DSI LCD (C)" \
@@ -717,7 +717,7 @@ do_lcd_choice() {
       BSTRING="11.9inch DSI LCD"
     fi
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "Default display set to $BSTRING" 20 60 1
+      dialog --keep-tite --msgbox "Default display set to $BSTRING" 20 60
       ASK_TO_REBOOT=1
     fi
   fi
@@ -729,19 +729,19 @@ do_update_miniboot()
   DO_DOWNLOAD=0
 
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --yesno "Would you like update the minimal boot image in nand flash?\n\nCaution: Abnormal interruptions are not allowed during the upgrade process!" $DEFAULT 20 60 2
+    dialog --keep-tite $DEFAULT --yesno "Would you like update the minimal boot image in nand flash?\n\nCaution: Abnormal interruptions are not allowed during the upgrade process!" 20 60
     [ $? -eq 0 ] || return
   fi
 
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --yesno "Do you want to download the latest hobot-miniboot from the internet?\n\nPlease ensure the network connection is stable before continuing." $DEFAULT 20 60 2
+    dialog --keep-tite $DEFAULT --yesno "Do you want to download the latest hobot-miniboot from the internet?\n\nPlease ensure the network connection is stable before continuing." 20 60
     [ $? -eq 0 ] && DO_DOWNLOAD=1
   fi
 
   if [ "$DO_DOWNLOAD" = 1 ] || ! is_installed hobot-miniboot; then
     echo "Attempting to install hobot-miniboot..."
     apt update;
-    apt-get install -y hobot-miniboot; 
+    apt-get install -y hobot-miniboot;
   fi
 
   echo "Starting rdk-miniboot-update..."
@@ -762,7 +762,7 @@ do_vnc_resolution() {
     if [ "$CUR" = "" ] ; then
       CUR=640x480
     fi
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item $CUR --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --default-item $CUR --cancel-label Back --ok-label Select --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "640x480" "" "720x480" "" "800x600" "" "1024x768" "" "1280x720" "" "1280x1024" "" "1600x1200" "" "1920x1080" "" 3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -781,7 +781,7 @@ NoDisplay=true
 Exec=sh -c "if ! (xrandr | grep -q -w connected) ; then /usr/bin/xrandr --fb $FUN ; fi"
 EOF
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "The resolution is set to $FUN" 20 60 1
+      dialog --keep-tite --msgbox "The resolution is set to $FUN" 20 60
       ASK_TO_REBOOT=1
     fi
   fi
@@ -797,7 +797,7 @@ get_ssh() {
 
 do_ssh() {
   if [ -e /var/log/regen_ssh_keys.log ] && ! grep -q "^finished" /var/log/regen_ssh_keys.log; then
-    whiptail --msgbox "Initial ssh key generation still running. Please wait and try again." 20 60 2
+    dialog --keep-tite --msgbox "Initial ssh key generation still running. Please wait and try again." 20 60
     return 1
   fi
   DEFAULT=--defaultno
@@ -805,9 +805,9 @@ do_ssh() {
     DEFAULT=
   fi
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --yesno \
+    dialog --keep-tite $DEFAULT --yesno \
       "Would you like the SSH server to be enabled?\n\nCaution: Default and weak passwords are a security risk when SSH is enabled!" \
-      $DEFAULT 20 60 2
+      20 60
     RET=$?
   else
     RET=$1
@@ -825,7 +825,7 @@ do_ssh() {
     return $RET
   fi
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "The SSH server is $STATUS" 20 60 1
+    dialog --keep-tite --msgbox "The SSH server is $STATUS" 20 60
   fi
 }
 
@@ -844,7 +844,7 @@ do_vnc() {
   fi
   APT_GET_FLAGS=""
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --yesno "Would you like the VNC Server to be enabled?" $DEFAULT 20 60 2
+    dialog --keep-tite $DEFAULT --yesno "Would you like the VNC Server to be enabled?" 20 60
     RET=$?
   else
     RET=$1
@@ -857,10 +857,10 @@ do_vnc() {
     fi
 
     if is_installed x11vnc || apt-get install "$APT_GET_FLAGS" x11vnc; then
-      whiptail --msgbox "You will now be asked to enter a password for the VNC server" 20 60 1
+      dialog --keep-tite --msgbox "You will now be asked to enter a password for the VNC server" 20 60
       mkdir -p /etc/.vnc
       vncpasswd /etc/.vnc/passwd &&
-      whiptail --msgbox "Password setted successfully" 20 60 1
+      dialog --keep-tite --msgbox "Password setted successfully" 20 60
       systemctl enable x11vnc.service &&
       systemctl start x11vnc.service &&
       STATUS=enabled
@@ -877,13 +877,13 @@ do_vnc() {
     return $RET
   fi
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "The VNC Server is $STATUS" 20 60 1
+    dialog --keep-tite --msgbox "The VNC Server is $STATUS" 20 60
   fi
 }
 
 warn_box() {
   text="$1"
-  return $(whiptail --title "WARNNING" --msgbox "$text" 20 60 1)
+  return $(dialog --keep-tite --title "WARNNING" --msgbox "$text" 20 60)
 }
 
 update_status() {
@@ -898,16 +898,16 @@ update_status() {
     fi
     options+=("$peri" "                     ${peri_status[$peri]}")
   done
-  peri_select=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" \
+  peri_select=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" \
+    --cancel-label Back \
+    --ok-label Select \
     --menu "Peripherals bus config" \
     $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
-    --cancel-button Back \
-    --ok-button Select \
     "${options[@]}" \
     3>&1 1>&2 2>&3)
   ret=$?
-  if [ $ret -ne 0 ];then 
-    return 1 
+  if [ $ret -ne 0 ];then
+    return 1
   fi
   unset options
   # echo peri_select=$peri_select
@@ -1015,7 +1015,7 @@ peri_ops() {
     fi
   fi
 
-  whiptail --title "Your select" \
+   dialog --keep-tite --title "Your select" \
     --yesno "Are you sure want to ${options}able $peri? \
     \n${string}" \
     20 60 \
@@ -1060,7 +1060,7 @@ do_peripheral() {
       case $hex_btype in
        "0x301")
           config="/etc/hobot.conf/x5rdk.conf"
-          ;; 
+          ;;
        "0x302")
           config="/etc/hobot.conf/x5rdk.conf"
           ;;
@@ -1209,7 +1209,7 @@ do_peripheral() {
 do_wifi_antenna()
 {
   if [ "$INTERACTIVE" = True ]; then
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "Onboard" --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$( dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --default-item "Onboard" --cancel-label Back --ok-label Select  --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "Onboard" "" "External" ""  3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -1228,7 +1228,7 @@ do_wifi_antenna()
     fi
 
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "The Wi-Fi antenna is switch to ${FUN} antenna" 20 60 1
+      dialog --keep-tite --msgbox "The Wi-Fi antenna is switch to ${FUN} antenna" 20 60
     fi
   fi
 }
@@ -1244,12 +1244,12 @@ get_cpu_boost() {
 
 do_cpu_boost() {
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "\
+    dialog --keep-tite --msgbox "\
 Enabling overclocking will increase CPU power consumption.
 Please install a sufficient radiator(such as enlarging the
 radiator, using a cooling fan) to avoid system instability
 caused by excessive temperature.\
-" 20 70 1
+" 20 70
   fi
 
   DEFAULT=--defaultno
@@ -1258,9 +1258,9 @@ caused by excessive temperature.\
   fi
 
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --yesno \
+    dialog --keep-tite $DEFAULT --yesno \
       "Would you like the CPU boost to be enabled?" \
-      $DEFAULT 20 60 2
+      20 60
     RET=$?
   else
     RET=$1
@@ -1277,7 +1277,7 @@ caused by excessive temperature.\
     return $RET
   fi
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "The CPU boost is $STATUS" 20 60 1
+    dialog --keep-tite --msgbox "The CPU boost is $STATUS" 20 60
     ASK_TO_REBOOT=1
   fi
 }
@@ -1296,9 +1296,9 @@ do_cpu_governor() {
     if [ "$CUR" = "" ] ; then
       CUR=performance
     fi
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" \
-      --default-item $CUR --menu "Set CPU governor" \
-      $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" \
+      --default-item $CUR --cancel-label Back --ok-label Select --menu "Set CPU governor" \
+      $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "conservative" "" "ondemand" "" "userspace" "" "powersave" "" "performance" "" "schedutil" "" 3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -1311,7 +1311,7 @@ do_cpu_governor() {
     set_config_var governor $FUN ${CONFIG}
     echo $FUN > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "The cpu governor is set to $FUN" 20 60 1
+      dialog --keep-tite --msgbox "The cpu governor is set to $FUN" 20 60
       ASK_TO_REBOOT=1
     fi
   fi
@@ -1327,7 +1327,7 @@ get_cpu_frequency() {
 
 do_cpu_frequency() {
   if [ $(get_cpu_governor) != "userspace" ]; then
-    whiptail --msgbox "The cpu frequency can only be set when the governor is set to userspace" 20 60 2
+    dialog --keep-tite --msgbox "The cpu frequency can only be set when the governor is set to userspace" 20 60
     return 0
   fi
   if [ "$INTERACTIVE" = True ]; then
@@ -1342,9 +1342,9 @@ do_cpu_frequency() {
       available_frequencies="$available_frequencies $boost_frequencies"
     fi
 
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" \
-      --default-item $CUR --menu "Set CPU frequency" \
-      $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" \
+      --default-item $CUR --cancel-label Back --ok-label Select --menu "Set CPU frequency" \
+      $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       ${available_frequencies} 3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -1357,16 +1357,17 @@ do_cpu_frequency() {
     set_config_var frequency $FUN ${CONFIG}
     echo $FUN > /sys/devices/system/cpu/cpufreq/policy0/scaling_setspeed
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "The cpu frequency is set to $FUN" 20 60 1
+      dialog --keep-tite --msgbox "The cpu frequency is set to $FUN" 20 60
       ASK_TO_REBOOT=1
     fi
   fi
 }
 
 do_cpu_frequency_menu() {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" \
+  FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" \
+      --cancel-label Back --ok-label Select \
       --menu "Configure CPU frequency" \
-      $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+      $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "C1 CPU Boost" "Configure CPU overclocking" \
       "C2 CPU Governor" "Configure the CPU frequency governor mode" \
       "C3 CPU Frequency" "Configure the CPU to run at a fixed frequency (only Governor = userspace)" \
@@ -1379,8 +1380,8 @@ do_cpu_frequency_menu() {
       C1\ *) do_cpu_boost ;;
       C2\ *) do_cpu_governor ;;
       C3\ *) do_cpu_frequency ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
@@ -1421,7 +1422,7 @@ do_config_ion_memory ()
     if [ "$CUR" = "" ] ; then
       CUR=128MB+320MB+320MB
     fi
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item $CUR --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --default-item $CUR --cancel-label Back --ok-label Select --menu "Set VNC Resolution" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
     "128MB+320MB+320MB" "" "192MB+384MB+384MB" "" "256MB+512MB+512MB" "" "320MB+640MB+640MB" "" "512MB+1024MB+1024MB" "" 3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -1460,7 +1461,7 @@ do_config_ion_memory ()
       echo "ion=ion_carveout_size=${ion_carveout_size_hex}" >> "${CONFIG}"
     fi
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "The ion memory is set to ${FUN}" 20 60 1
+      dialog --keep-tite --msgbox "The ion memory is set to ${FUN}" 20 60
       ASK_TO_REBOOT=1
     fi
   fi
@@ -1470,7 +1471,7 @@ do_expand_rootfs() {
   rm -f /etc/.do_expand_partiton /etc/.do_resizefs_rootfs
   /etc/init.d/hobot-resizefs start
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "Root partition has been resized" 20 60 1
+    dialog --keep-tite --msgbox "Root partition has been resized" 20 60
   fi
 }
 
@@ -1499,7 +1500,7 @@ do_proxy() {
     else
       STRING="Please enter proxy address.\\nEg: http://user:pass@proxy:8080"
     fi
-    if ! ADDRESS="$(whiptail --inputbox "$STRING"  20 60 "$CURRENT" 3>&1 1>&2 2>&3)"; then
+    if ! ADDRESS="$(dialog --keep-tite --inputbox "$STRING"  20 60 "$CURRENT" 3>&1 1>&2 2>&3)"; then
       return 0
     fi
   fi
@@ -1532,13 +1533,13 @@ do_proxy() {
     fi
   done
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "Proxy settings $STATUS" 20 60 1
+    dialog --keep-tite --msgbox "Proxy settings $STATUS" 20 60
   fi
 }
 
 do_boot_order() {
   if [ "$INTERACTIVE" = True ]; then
-    BOOTOPT=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Boot Device Order" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+    BOOTOPT=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --menu "Boot Device Order" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "B1 SD Card Boot" "Boot from SD Card if available, otherwise boot from USB" \
       "B2 EMMC Boot" "Boot from USB if available, otherwise boot from SD Card" \
       3>&1 1>&2 2>&3)
@@ -1557,13 +1558,13 @@ do_boot_order() {
         STATUS="EMMC"
         ;;
       *)
-        whiptail --msgbox "Programmer error, unrecognised boot option" 20 60 2
+        dialog --keep-tite --msgbox "Programmer error, unrecognised boot option" 20 60
         return 1
         ;;
     esac
     ASK_TO_REBOOT=1
     if [ "$INTERACTIVE" = True ]; then
-      whiptail --msgbox "$STATUS is default boot device" 20 60 1
+      dialog --keep-tite --msgbox "$STATUS is default boot device" 20 60
     fi
   fi
 }
@@ -1610,7 +1611,7 @@ do
 done
 
 do_system_menu() {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "System Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+  FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --cancel-label Back --ok-label Select --menu "System Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
     "S1 Wireless LAN" "Enter SSID and passphrase" \
     "S2 Password" "Change password for the '$USER' user" \
     "S3 Hostname" "Set name for this computer on a network" \
@@ -1632,13 +1633,13 @@ do_system_menu() {
       S5\ *) do_leds ;;
       S6\ *) do_browser ;;
       S7\ *) do_update_miniboot ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60 ;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
 do_display_menu() {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+  FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --cancel-label Back --ok-label Select  --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
     "D1 Dsiplay Choice" " DSI or HDMI" \
     "D2 Dsiplay Choice" " CPU or GPU" \
     "D3 MIPI LCD Choice" " waveshare panel choice" \
@@ -1652,8 +1653,8 @@ do_display_menu() {
       D1\ *) do_drm_display_choice ;;
       D2\ *) do_drm_display_choice_gpu ;;
       D3\ *) do_lcd_choice ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60 ;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
@@ -1705,7 +1706,7 @@ do_sound_devices_select() {
     fi
 
 
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "$CUR" --menu "Select Sound Device" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --default-item "$CUR" --cancel-label Back --ok-label Select --menu "Select Sound Device" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT  \
       "${audio_options[@]}" 3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -1844,7 +1845,7 @@ do_imu_devices_select(){
       # imu_options=(""SPI-Interface" "" "I2C-Interface" """)
       imu_options=("""BMI088-SPI-Interface"""  "    Use SPI1 as the data interface for IMU."  ""BMI088-I2C-Interface"" "    Use I2C5 as the data interface for IMU." ""ICM42688-I2C-Interface"" "    Use I2C4 or I2C6 as the data interface for Stereo Camera IMU." ""UNSET"" "    Unset IMU driver hat")
     fi
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "Onboard" --menu "Set IMU bmi088" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --default-item "Onboard" --cancel-label Back --ok-label Select --menu "Set IMU bmi088" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "${imu_options[@]}"  3>&1 1>&2 2>&3)
     RET=$?
     # echo "$FUN""  RET=""$RET"
@@ -1891,7 +1892,7 @@ do_v4l2_cam1(){
   dtfilehead="dtoverlay_cam1_"
 
   if [ "$INTERACTIVE" = "True" ]; then
-    FUN=$(whiptail --title "CAM1 SET" --default-item "UNSET" --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "CAM1 SET" --default-item "UNSET" --cancel-label Back --ok-label Select --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "UNSET" "" "OV5647" "" "IMX219" "" "IMX477" "" 3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -1909,7 +1910,7 @@ do_v4l2_cam1(){
       fi
       return 0
     fi
-    
+
     if [ "$FUN" == "OV5647" ]; then
       dtfile=""$dtfilehead"ov5647"
     elif [ "$FUN" == "IMX219" ]; then
@@ -1929,7 +1930,7 @@ do_v4l2_cam1(){
   fi
 
   if [ "$INTERACTIVE" = "True" ]; then
-    whiptail --msgbox "The cam1 sensor is set to ${FUN}" 20 60 1
+    dialog --keep-tite --msgbox "The cam1 sensor is set to ${FUN}" 20 60
   fi
 }
 
@@ -1937,7 +1938,7 @@ do_v4l2_cam0(){
   dtfilehead="dtoverlay_cam0_"
 
   if [ "$INTERACTIVE" = "True" ]; then
-    FUN=$(whiptail --title "CAM0 SET" --default-item "UNSET" --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "CAM0 SET" --default-item "UNSET"  --cancel-label Back --ok-label Select --menu "CAM0 sensor choose" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "UNSET" "" "OV5647" "" "IMX219" "" "IMX477" "" 3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -1976,7 +1977,7 @@ do_v4l2_cam0(){
   fi
 
   if [ "$INTERACTIVE" = "True" ]; then
-    whiptail --msgbox "The cam0 sensor is set to ${FUN}" 20 60 1
+    dialog --keep-tite --msgbox "The cam0 sensor is set to ${FUN}" 20 60
   fi
 
   do_v4l2_cam1
@@ -1989,7 +1990,7 @@ do_v4l2_select(){
   dtfilehead1="dtoverlay_cam1_"
 
   if [ "$INTERACTIVE" = "True" ]; then
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --default-item "HBN" --menu "Set camera interface" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --default-item "HBN" --cancel-label Back --ok-label Select --menu "Set camera interface" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "HBN" "" "V4L2 sif-isp-vse" ""  "V4L2 vse alone" "" 3>&1 1>&2 2>&3)
     RET=$?
   else
@@ -2035,7 +2036,7 @@ do_v4l2_select(){
   fi
 
   if [ "$INTERACTIVE" = "True" ]; then
-    whiptail --msgbox "The camera interface is set to ${FUN}" 20 60 1
+    dialog --keep-tite --msgbox "The camera interface is set to ${FUN}" 20 60
   fi
 
   if [ "${FUN}" = "V4L2 sif-isp-vse" ]; then
@@ -2054,7 +2055,7 @@ do_v4l2_select(){
 }
 
 do_V4L2_menu() {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "V4L2 Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+  FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)"  --cancel-label Back --ok-label Select --menu "V4L2 Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
     "I1 V4L2" "Enable/disable V4L2 interface for camera" \
     3>&1 1>&2 2>&3)
   RET=$?
@@ -2063,13 +2064,13 @@ do_V4L2_menu() {
   elif [ $RET -eq 0 ]; then
     case "$FUN" in
       I1\ *) do_v4l2_select ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60 ;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
 do_interface_menu() {
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Interfacing Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --cancel-label Back --ok-label Select --menu "Interfacing Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "I1 SSH" "Enable/disable remote command line access using SSH" \
       "I2 VNC" "Enable/disable graphical remote desktop access" \
       "I3 Peripheral bus config" "Enable/disable peripheral bus(spi,i2c,serial,i2s,etc.)" \
@@ -2090,13 +2091,13 @@ do_interface_menu() {
       I5\ *) do_sound_devices_select ;;
       I6\ *) do_imu_devices_select ;;
       I7\ *) do_V4L2_menu ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60 ;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
 do_performance_menu() {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Performance Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+  FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)"  --cancel-label Back --ok-label Select --menu "Performance Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "P1 CPU frequency" "Configure CPU frequency" \
       "P2 ION memory" "Configure ION memory size for BPU and multimedia" \
       3>&1 1>&2 2>&3)
@@ -2107,13 +2108,13 @@ do_performance_menu() {
     case "$FUN" in
       P1\ *) do_cpu_frequency_menu ;;
       P2\ *) do_config_ion_memory ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60 ;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
 do_internationalisation_menu() {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Localisation Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+  FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --cancel-label Back --ok-label Select --menu "Localisation Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
     "L1 Locale" "Configure language and regional settings" \
     "L2 Timezone" "Configure time zone" \
     "L3 Keyboard" "Set keyboard layout to match your keyboard" \
@@ -2126,20 +2127,20 @@ do_internationalisation_menu() {
       L1\ *) do_change_locale ;;
       L2\ *) do_change_timezone ;;
       L3\ *) do_configure_keyboard ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60 ;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
 do_advanced_menu() {
   if is_rdkmd ; then
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --cancel-label Back --ok-label Select --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
       "A2 Network Proxy Settings" "Configure network proxy settings" \
       "A3 Boot Order" "Choose network or USB device boot" \
       3>&1 1>&2 2>&3)
   else
-   FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+   FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)"  --cancel-label Back --ok-label Select --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
       "A2 Network Proxy Settings" "Configure network proxy settings" \
       3>&1 1>&2 2>&3)
@@ -2152,8 +2153,8 @@ do_advanced_menu() {
       A1\ *) do_expand_rootfs ;;
       A2\ *) do_proxy_menu ;;
       A3\ *) do_boot_order ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60 ;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
@@ -2163,7 +2164,7 @@ do_isp_imx219() {
   local TARGETS=("640x480" "1632x1232" "1920x1080" "3264x2464")
 
   if [ "$INTERACTIVE" = True ]; then
-    FOV_SELECTED=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" \
+    FOV_SELECTED=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" \
       --menu "Select FOV Profile" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "1" "FOV 79.3°" \
       "2" "FOV 120°" \
@@ -2198,14 +2199,14 @@ do_isp_imx219() {
   done
 
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "ISP effects set to: $PROFILE" 20 60 1
+    dialog --keep-tite --msgbox "ISP effects set to: $PROFILE" 20 60
   fi
 
   return 0
 }
 
 do_sensor_isp() {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+  FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --cancel-label Back --ok-label Select --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT  \
     "A1 IMX219" "Switch ISP effects for 79.3° / 120° FOV" \
     3>&1 1>&2 2>&3)
 
@@ -2215,13 +2216,13 @@ do_sensor_isp() {
   elif [ $RET -eq 0 ]; then
     case "$FUN" in
       A1\ *) do_isp_imx219 ;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60 ;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
 do_proxy_menu() {
-  FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "Network Proxy Settings" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
+  FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --cancel-label Back --ok-label Select --menu "Network Proxy Settings" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT  \
     "P1 All" "Set the same proxy for all schemes" \
     "P2 HTTP" "Set the HTTP proxy" \
     "P3 HTTPS" "Set the HTTPS/SSL proxy" \
@@ -2240,14 +2241,14 @@ do_proxy_menu() {
       P4\ *) do_proxy ftp ;;
       P5\ *) do_proxy rsync ;;
       P6\ *) do_proxy no;;
-      *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-    esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+      *) dialog --keep-tite --msgbox "Programmer error: unrecognized option" 20 60 ;;
+    esac || dialog --keep-tite --msgbox "There was an error running option $FUN" 20 60
   fi
 }
 
 do_finish() {
   if [ $ASK_TO_REBOOT -eq 1 ]; then
-    whiptail --yesno "Would you like to reboot now?" 20 60 2
+    dialog --keep-tite --yesno "Would you like to reboot now?" 20 60
     if [ $? -eq 0 ]; then # yes
       sync
       reboot
@@ -2263,13 +2264,13 @@ if [ "$INTERACTIVE" = True ]; then
   [ -e $CONFIG ] || touch $CONFIG
   calc_wt_size
   while [ "$USER" = "root" ] || [ -z "$USER" ]; do
-    if ! USER=$(whiptail --inputbox "srpi-config could not determine the default user.\\n\\nWhat user should these settings apply to?" 20 60 pi 3>&1 1>&2 2>&3); then
+    if ! USER=$(dialog --keep-tite --inputbox "srpi-config could not determine the default user.\\n\\nWhat user should these settings apply to?" 20 60 pi 3>&1 1>&2 2>&3); then
       return 0
     fi
   done
   backtitle=$(cat /proc/device-tree/model | tr -d '\0')
   while true; do
-    FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --backtitle "${backtitle}" --menu "Setup Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Finish --ok-button Select \
+    FUN=$(dialog --keep-tite --title "RDK Software Configuration Tool (srpi-config)" --backtitle "${backtitle}" --cancel-label Finish --ok-label Select --menu "Setup Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
       "1 System Options" "Configure system settings" \
       "2 Display Options" "Configure display settings" \
       "3 Interface Options" "Configure connections to peripherals" \
@@ -2294,11 +2295,10 @@ if [ "$INTERACTIVE" = True ]; then
         7\ *) do_sensor_isp ;;
         8\ *) do_update ;;
         9\ *) do_about ;;
-        *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
-      esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+        *) dialog --keep-tite  --msgbox "Programmer error: unrecognized option" 20 60 ;;
+      esac || dialog --keep-tite  --msgbox "There was an error running option $FUN" 20 60
     else
       exit 1
     fi
   done
 fi
-
