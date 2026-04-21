@@ -24,6 +24,7 @@ SYSFS_GPIO = "/sys/class/gpio"
 SYSFS_PLATFORM_PATH = '/sys/devices/platform/'
 SYSFS_BOARDID_PATH = '/sys/class/socinfo/board_id'
 SYSFS_SOCNAME_PATH = '/sys/class/socinfo/soc_name'
+SYSFS_SOMNAME_PATH="/sys/class/socinfo/som_name"
 HOBOT_PI_PATTERN = 'hobot,x3'
 
 # [0]- GPIO chip sysfs directory
@@ -307,8 +308,12 @@ def get_all_pin_data():
         sboard_id = "0x" + f.read()
         iboard_id = int(sboard_id,16)
         board_id = iboard_id & 0xfff
-    with open(SYSFS_SOCNAME_PATH, 'r') as f:
-        soc_name = f.read().strip()
+    if os.path.exists(SYSFS_SOCNAME_PATH):
+        with open(SYSFS_SOCNAME_PATH, 'r') as f:
+            soc_name = f.read().strip()
+    else:
+        with open(SYSFS_SOMNAME_PATH, 'r') as f:
+            soc_name = f.read().strip()
     if 'x5' in soc_name.lower():
         board_list = ALL_BOARD_DATA_X5
     else:
