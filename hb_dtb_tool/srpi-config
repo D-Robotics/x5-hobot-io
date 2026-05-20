@@ -1822,6 +1822,24 @@ do_sound_devices_select() {
 	        echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
 	      grep -q "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
 	        echo "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
+      elif [[ "$board_type_string" == *x3* ]]; then
+        #remove asound state,for the pa setting
+        rm -f /var/lib/alsa/asound.state
+        #soft link our pre-set config
+        ln -s /etc/hobot_audio_config/wm8960_config/wm8960_asound.state /var/lib/alsa/asound.state
+        if [[ "$board_type_string" == *x3_rdk_v1* ]]; then
+          sed -i '/^load-module module-udev-detect$/c\
+load-module module-alsa-sink device=hw:0,0 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2 rewind_safeguard=1920\
+load-module module-alsa-source device=hw:0,1 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2' /etc/pulse/default.pa
+        elif [[ "$board_type_string" == *x3_rdk_v2* ]]; then
+          sed -i '/^load-module module-udev-detect$/c\
+load-module module-alsa-sink device=hw:0,1 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2 rewind_safeguard=1920\
+load-module module-alsa-source device=hw:0,0 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2' /etc/pulse/default.pa
+        elif [[ "$board_type_string" == *x3_md* ]]; then
+          sed -i '/^load-module module-udev-detect$/c\
+load-module module-alsa-sink device=hw:0,0 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2 rewind_safeguard=1920\
+load-module module-alsa-source device=hw:0,1 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2' /etc/pulse/default.pa
+        fi
       fi
       audio_hat_type_string="wm8960"
     fi
@@ -1895,6 +1913,12 @@ do_unset_audio_hat(){
   sed -i '/set-default-source alsa_input.hw_0_1/d' /etc/pulse/default.pa
   sed -i '/set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback/d' /etc/pulse/default.pa
   sed -i '/set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback/d' /etc/pulse/default.pa
+  sed -i '/load-module module-alsa-sink device=hw:0,0 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2 rewind_safeguard=1920/d' /etc/pulse/default.pa
+  sed -i '/load-module module-alsa-source device=hw:0,0 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2/d' /etc/pulse/default.pa
+  sed -i '/load-module module-alsa-sink device=hw:0,1 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2 rewind_safeguard=1920/d' /etc/pulse/default.pa
+  sed -i '/load-module module-alsa-source device=hw:0,1 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2/d' /etc/pulse/default.pa
+  grep -q "^load-module module-udev-detect$" /etc/pulse/default.pa || \
+    sed -i '/^\.ifexists module-udev-detect\.so$/a load-module module-udev-detect' /etc/pulse/default.pa
 }
 
 do_imu_devices_select(){
