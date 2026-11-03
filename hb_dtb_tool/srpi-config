@@ -674,6 +674,17 @@ update_lcd_config() {
         else
             echo "dtoverlay=dsi-waveshare-panel-overlay-${lcd_size}" >> "${CONFIG}"
         fi
+        # U-Boot panel alias (x5_boot_ui=logo/console path): only written
+        # for panels U-Boot actually drives. 4.3inch DSI LCD == wh-cm480;
+        # other waveshare sizes have no U-Boot driver, so no line is
+        # written and U-Boot keeps its Kconfig default panel.
+        if [ "${lcd_size}" = "4_3_inch" ]; then
+            if grep -q "^x5_lcd_panel=" "${CONFIG}"; then
+                sed -i "s|^x5_lcd_panel=.*|x5_lcd_panel=wh480|" "${CONFIG}"
+            else
+                echo "x5_lcd_panel=wh480" >> "${CONFIG}"
+            fi
+        fi
     fi
 }
 
@@ -704,6 +715,9 @@ do_lcd_choice() {
           mv /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf.disable /etc/X11/xorg.conf.d/xorg_dsi_ignore.conf
       fi
       sed -i "/^dtoverlay=dsi-waveshare-panel-overlay-/d" "${CONFIG}"
+      # Remove the U-Boot panel alias too: switching back to HDMI must
+      # leave no stale DSI panel selection in config.txt.
+      sed -i "/^x5_lcd_panel=/d" "${CONFIG}"
       BSTRING="HDMI"
     elif [ "$RES" = "2" ] ; then
       update_lcd_config "2_8_inch"
