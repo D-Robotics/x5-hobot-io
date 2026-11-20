@@ -1629,26 +1629,9 @@ fi
 
 #
 # Command line options for non-interactive use
+# (dispatch block lives at the end of the file, after all function
+#  definitions, so that nonint can call any function)
 #
-for i in $*
-do
-  case $i in
-  --expand-rootfs)
-    INTERACTIVE=False
-    rm -f /etc/.do_expand_partiton /etc/.do_resizefs_rootfs
-    /etc/init.d/hobot-resizefs start
-    exit 0
-    ;;
-  nonint)
-    INTERACTIVE=False
-    "$@"
-    exit $?
-    ;;
-  *)
-    # unknown option
-    ;;
-  esac
-done
 
 do_system_menu() {
   FUN=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" --menu "System Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -1742,7 +1725,215 @@ getMinibootUpdateVersion()
    fi
 }
 
+do_sound_devices_select_engine() {
+  local PROFILE_BIN=/usr/bin/hobot-audio-profile
+  local PROFILES_SHARE_DIR=/usr/share/hobot_audio_config/profiles
+  local options=() id disp boards show
+  local board_type_string
+  board_type_string=$(get_rdk_type_string)
+  local cur
+  cur=$(cat /etc/hobot_audio_config/cur_profile 2>/dev/null)
+
+  # dynamic menu entries from installed profiles, filtered by board marker
+  # (PROFILE_BOARDS tokens are matched as prefixes of get_rdk_type_string,
+  # same semantics as the legacy menu's *x3_rdk_v1* / *x5* patterns, so
+  # "x5_rdk" also matches "x5_rdk_v0", "x3_rdk_v1" also "x3_rdk_v1_2")
+  while IFS=$'\t' read -r id disp; do
+    [ -n "$id" ] || continue
+    unset PROFILE_BOARDS
+    # shellcheck disable=SC1090
+    . "$PROFILES_SHARE_DIR/$id.profile" 2>/dev/null
+    boards="${PROFILE_BOARDS:-}"
+    unset PROFILE_BOARDS
+    show=0
+    for board in $boards; do
+      case "$board_type_string" in
+        $board*) show=1; break ;;
+      esac
+    done
+    [ "$show" = "1" ] || continue
+    options+=("$id" "    $disp")
+  done < <($PROFILE_BIN list)
+  options+=("UNSET" "    Unset audio board")
+
+  if [ "$INTERACTIVE" = True ]; then
+    local default_item="${cur:-UNSET}"
+    local FUN_engine
+    FUN_engine=$(whiptail --title "RDK Software Configuration Tool (srpi-config)" \
+      --default-item "$default_item" --menu "Select Sound Device" \
+      "$WT_HEIGHT" "$WT_WIDTH" "$WT_MENU_HEIGHT" \
+      --cancel-button Back --ok-button Select \
+      "${options[@]}" 3>&1 1>&2 2>&3)
+    local ret=$?
+    if [ $ret -eq 1 ]; then
+      return 0
+    fi
+    do_engine_audio_apply "$FUN_engine"
+  else
+    # nonint: arg is profile-id or UNSET
+    do_engine_audio_apply "$1"
+  fi
+}
+
+do_engine_audio_apply() {
+  local sel="$1"
+  local PROFILE_BIN=/usr/bin/hobot-audio-profile
+  local PROFILES_SHARE_DIR=/usr/share/hobot_audio_config/profiles
+  # previous selection: governs whether the legacy rollback runs first
+  # (engine default: no selection file = UNSET)
+  local CUR
+  CUR=$(cat /etc/hobot_audio_config/cur_audio_hat 2>/dev/null || echo "UNSET")
+  mkdir -p /etc/hobot_audio_config
+
+  if [ "$sel" = "UNSET" ]; then
+    # Clear cur_profile BEFORE engine unset (remove-then-clean)
+    rm -f /etc/hobot_audio_config/cur_profile
+    # engine unset restores asound/PA, retires its own modules-load entry
+    # and re-enables the codec blacklist; the legacy rollback below still
+    # covers the dtbo overlay in /boot/config.txt and the pulse basic items
+    "$PROFILE_BIN" unset > /dev/null 2>&1
+    do_unset_audio_hat
+    systemctl disable hobot-audio-profile.service 2> /dev/null
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "Audio board selection cleared (UNSET)." 20 60 1
+    else
+      echo "Audio board selection cleared (UNSET)."
+    fi
+    return 0
+  fi
+
+  # legacy path first: hardware appearance (blacklist rename + dtbo overlay
+  # in /boot/config.txt + pulse basic items), unchanged behaviour
+  audio_hat_type_string=""
+  if [ "$sel" = "audio_hat_v1" ]; then
+    if [ "$CUR" != "UNSET" ]; then
+      do_unset_audio_hat
+      CUR="$sel"
+    fi
+    if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
+      mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
+      do_set_audio_machine
+    fi
+    audio_hat_type_string="es7210_es8156"
+  elif [ "$sel" = "audio_hat_v2_4mic" ] || [ "$sel" = "audio_hat_v2_6mic" ] || [ "$sel" = "hiwonder_hat" ] || [ "$sel" = "wm8960_hat" ]; then
+    if [ "$CUR" != "UNSET" ]; then
+      do_unset_audio_hat
+      CUR="$sel"
+    fi
+    case "$sel" in
+      audio_hat_v2_4mic|audio_hat_v2_6mic)
+        if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
+          mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
+          do_set_audio_machine
+        fi
+        audio_hat_type_string="es7210_es8156"
+        ;;
+      hiwonder_hat)
+        if [ -e /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf ]; then
+          mv /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf /lib/modprobe.d/blacklist-hobot-codec-hiwonder.disable
+          do_set_audio_machine
+        fi
+        audio_hat_type_string="hiwonder_rasadapter5b"
+        ;;
+      wm8960_hat)
+        if [ -e /lib/modprobe.d/blacklist-hobot-codec-wm8960.conf ]; then
+          mv /lib/modprobe.d/blacklist-hobot-codec-wm8960.conf /lib/modprobe.d/blacklist-hobot-codec-wm8960.disable
+          do_set_audio_machine
+        fi
+        if [[ "$board_type_string" == *x3* ]]; then
+          #remove asound state,for the pa setting
+          rm -f /var/lib/alsa/asound.state
+          #soft link our pre-set config
+          ln -s /etc/hobot_audio_config/wm8960_config/wm8960_asound.state /var/lib/alsa/asound.state
+          if [[ "$board_type_string" == *x3_rdk_v1* ]]; then
+            sed -i '/^load-module module-udev-detect$/c\
+load-module module-alsa-sink device=hw:0,0 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2 rewind_safeguard=1920\
+load-module module-alsa-source device=hw:0,1 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2' /etc/pulse/default.pa
+          elif [[ "$board_type_string" == *x3_rdk_v2* ]]; then
+            sed -i '/^load-module module-udev-detect$/c\
+load-module module-alsa-sink device=hw:0,1 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2 rewind_safeguard=1920\
+load-module module-alsa-source device=hw:0,0 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2' /etc/pulse/default.pa
+          elif [[ "$board_type_string" == *x3_md* ]]; then
+            sed -i '/^load-module module-udev-detect$/c\
+load-module module-alsa-sink device=hw:0,0 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2 rewind_safeguard=1920\
+load-module module-alsa-source device=hw:0,1 mmap=false tsched=0 fragments=2 fragment_size=1920 rate=48000 channels=2' /etc/pulse/default.pa
+          fi
+        fi
+        audio_hat_type_string="wm8960"
+        ;;
+    esac
+  else
+    # unknown profile id: only the engine knows it; keep memory-only and
+    # let hobot-audio-profile validate it
+    echo "$sel" > /etc/hobot_audio_config/cur_audio_hat
+    if "$PROFILE_BIN" deploy "$sel" > /dev/null 2>&1; then
+      systemctl enable hobot-audio-profile.service 2> /dev/null
+      ASK_TO_REBOOT=1
+      if [ "$INTERACTIVE" = True ]; then
+        whiptail --msgbox "Audio board set to: $sel\nTakes effect at next boot." 20 60 1
+      else
+        echo "Audio board set to: $sel (applies at next boot)."
+      fi
+    else
+      if [ "$INTERACTIVE" = True ]; then
+        whiptail --msgbox "Failed to apply profile '$sel'.\nSelection is kept; check 'hobot-audio-profile status'." 20 60 1
+      else
+        echo "Failed to apply profile '$sel' (selection kept)." >&2
+      fi
+    fi
+    return 0
+  fi
+
+  # dtbo overlay selection (legacy semantics, splice name from option and board)
+  if [ "$audio_hat_type_string" != "" ]; then
+    local dtb_board_type="x5_rdk"
+    if [[ "$board_type_string" == *x3_rdk_v1* ]]; then
+      dtb_board_type="rdk_v1_x"
+    elif [[ "$board_type_string" == *x3_rdk_v2* ]]; then
+      dtb_board_type="rdk_v2"
+    elif [[ "$board_type_string" == *x3_md* ]]; then
+      dtb_board_type="rdk_md"
+    fi
+    dtboname="audio_"$audio_hat_type_string"_"$dtb_board_type""
+    if grep -q "dtoverlay="$dtboname"" /boot/config.txt; then
+      echo ""
+    else
+      echo "dtoverlay="$dtboname"" >> $CONFIG
+    fi
+    #stop pulseaudio,sometimes it gives some weird errors
+    kill -9 $(pidof pulseaudio) > /dev/null 2>&1
+    # engine deploy: memory only (validate + record); the boot service does
+    # the tuning, so select never fails on a card that is simply absent
+    echo "$sel" > /etc/hobot_audio_config/cur_audio_hat
+    if "$PROFILE_BIN" deploy "$sel" > /dev/null 2>&1; then
+      # enroll the per-profile module auto-load (per-profile module chain
+      # shipped as <id>.modules; systemd modules-load only reads *.conf,
+      # so install under the profile id with a .conf suffix; fall back to
+      # the global conf when absent)
+      cp "$PROFILES_SHARE_DIR/$sel.modules" "/etc/modules-load.d/$sel.conf" 2> /dev/null || \
+        cp /etc/hobot_audio_config/99_hobot_audio_module.conf /etc/modules-load.d/ 2> /dev/null
+      systemctl enable hobot-audio-profile.service 2> /dev/null
+      ASK_TO_REBOOT=1
+      if [ "$INTERACTIVE" = True ]; then
+        whiptail --msgbox "Audio board set to: $sel\nTakes effect at next boot." 20 60 1
+      else
+        echo "Audio board set to: $sel (applies at next boot)."
+      fi
+    else
+      if [ "$INTERACTIVE" = True ]; then
+        whiptail --msgbox "Failed to apply profile '$sel'.\nSelection is kept; check 'hobot-audio-profile status'." 20 60 1
+      else
+        echo "Failed to apply profile '$sel' (selection kept)." >&2
+      fi
+    fi
+  fi
+}
+
 do_sound_devices_select() {
+  if [ -x /usr/bin/hobot-audio-profile ] && [ -d /usr/share/hobot_audio_config/profiles ]; then
+    do_sound_devices_select_engine "$@"
+    return
+  fi
   board_type_string=$(get_rdk_type_string)
   if [ "$INTERACTIVE" = True ]; then
     CUR=$(get_cur_audio_hat)
@@ -1750,16 +1941,19 @@ do_sound_devices_select() {
     audio_options=("UNSET")
 
     if [[ "$board_type_string" == *x5* ]]; then
-      audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput" \
+      audio_options=("""Audio Driver HAT V2 (4-Mic)"""  "    4 chn input and 2 chn output" \
+                    """Audio Driver HAT V2 (6-Mic Ring)"""  "    6 chn input and 2 chn output" \
                     """Hiwonder Audio Driver HAT"""  "    2 chn input and 1 chn output" \
                     """WM8960 Audio Driver HAT"""  "    2 chn input and 2 chn output" \
                     ""UNSET"" "    Unset audio driver hat")
     elif [[ "$board_type_string" == *x3_rdk_v1* ]]; then
       audio_options=("""Audio Driver HAT V1"""  "    4 chn input and 2 chn ouput" \
-                    """Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput" \
+                    """Audio Driver HAT V2 (4-Mic)"""  "    4 chn input and 2 chn output" \
+                    """Audio Driver HAT V2 (6-Mic Ring)"""  "    6 chn input and 2 chn output" \
                     ""UNSET"" "    Unset audio driver hat")
     elif [[ "$board_type_string" == *x3_rdk_v2* ]] || [[ "$board_type_string" == *x3_md* ]]; then
-      audio_options=("""Audio Driver HAT V2"""  "    4 chn input and 2 chn ouput" \
+      audio_options=("""Audio Driver HAT V2 (4-Mic)"""  "    4 chn input and 2 chn output" \
+                    """Audio Driver HAT V2 (6-Mic Ring)"""  "    6 chn input and 2 chn output" \
                     """WM8960 Audio Driver HAT"""  "    2 chn input and 2 chn output" \
                     ""UNSET"" "    Unset audio driver hat")
     fi
@@ -1781,7 +1975,7 @@ do_sound_devices_select() {
       return
     fi
     #if audio is es7210+es8156
-    if [ "$FUN" == "Audio Driver HAT V1" ] || [ "$FUN" == "Audio Driver HAT V2" ]; then
+    if [ "$FUN" == "Audio Driver HAT V1" ] || [ "$FUN" == "Audio Driver HAT V2 (4-Mic)" ] || [ "$FUN" == "Audio Driver HAT V2 (6-Mic Ring)" ]; then
       if [ "$CUR" != "UNSET" ]; then
         do_unset_audio_hat
         CUR="$FUN"
@@ -1789,17 +1983,6 @@ do_sound_devices_select() {
       if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
         mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
         do_set_audio_machine
-      fi
-      if [[ "$board_type_string" == *x5* ]]; then
-        grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-          echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
-        grep -q "load-module module-alsa-source device=hw:0,1" /etc/pulse/default.pa || \
-          echo "load-module module-alsa-source device=hw:0,1" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
-        grep -q "set-default-source alsa_input.hw_0_1" /etc/pulse/default.pa || \
-          echo "set-default-source alsa_input.hw_0_1" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
-      elif [[ "$board_type_string" == *x3* ]]; then
-	      grep -q "load-module module-alsa-source device=hw:0,1" /etc/pulse/default.pa || \
-	          echo "load-module module-alsa-source device=hw:0,1" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
       fi
       audio_hat_type_string="es7210_es8156"
     fi
@@ -1813,12 +1996,6 @@ do_sound_devices_select() {
         mv /lib/modprobe.d/blacklist-hobot-codec-hiwonder.conf /lib/modprobe.d/blacklist-hobot-codec-hiwonder.disable
         do_set_audio_machine
       fi
-      if [[ "$board_type_string" == *x5* ]]; then
-	      grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-	        echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
-	      grep -q "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-	        echo "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
-      fi
       audio_hat_type_string="hiwonder_rasadapter5b"
     fi
       #use wm8960 audio codec HAT
@@ -1831,12 +2008,7 @@ do_sound_devices_select() {
         mv /lib/modprobe.d/blacklist-hobot-codec-wm8960.conf /lib/modprobe.d/blacklist-hobot-codec-wm8960.disable
         do_set_audio_machine
       fi
-      if [[ "$board_type_string" == *x5* ]]; then
-	      grep -q "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-	        echo "set-default-sink alsa_output.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
-	      grep -q "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" /etc/pulse/default.pa || \
-	        echo "set-default-source alsa_input.platform-hobot_sound_machine.stereo-fallback" | tee -a /etc/pulse/default.pa  > /dev/null 2>&1
-      elif [[ "$board_type_string" == *x3* ]]; then
+      if [[ "$board_type_string" == *x3* ]]; then
         #remove asound state,for the pa setting
         rm -f /var/lib/alsa/asound.state
         #soft link our pre-set config
@@ -1916,8 +2088,14 @@ do_unset_audio_hat(){
         mv  "$file" "$new_name"
     fi
   done
-  #remove auto load module step 2
+  #remove auto load module step 2 (legacy global conf and engine per-profile
+  # entries, both the correct .conf and any historical .modules suffix)
   rm -f /etc/modules-load.d/99_hobot_audio_module.conf
+  rm -f /etc/modules-load.d/audio_hat_v2_4mic.conf /etc/modules-load.d/audio_hat_v2_4mic.modules
+  rm -f /etc/modules-load.d/audio_hat_v2_6mic.conf /etc/modules-load.d/audio_hat_v2_6mic.modules
+  rm -f /etc/modules-load.d/audio_hat_v1.conf /etc/modules-load.d/audio_hat_v1.modules
+  rm -f /etc/modules-load.d/hiwonder_hat.conf /etc/modules-load.d/hiwonder_hat.modules
+  rm -f /etc/modules-load.d/wm8960_hat.conf /etc/modules-load.d/wm8960_hat.modules
   #remove alsa config step 3
   rm -f /var/lib/alsa/asound.state
   #delete dtoverlay setting step 1
@@ -2373,6 +2551,30 @@ do_finish() {
   fi
   exit 0
 }
+
+#
+# Command line options for non-interactive use
+# (placed after ALL function definitions so nonint can call any of them)
+#
+for i in $*
+do
+  case $i in
+  --expand-rootfs)
+    INTERACTIVE=False
+    rm -f /etc/.do_expand_partiton /etc/.do_resizefs_rootfs
+    /etc/init.d/hobot-resizefs start
+    exit 0
+    ;;
+  nonint)
+    INTERACTIVE=False
+    "$@"
+    exit $?
+    ;;
+  *)
+    # unknown option
+    ;;
+  esac
+done
 
 #
 # Interactive use loop
