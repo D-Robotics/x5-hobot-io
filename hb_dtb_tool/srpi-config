@@ -1779,6 +1779,12 @@ do_engine_audio_apply() {
   local sel="$1"
   local PROFILE_BIN=/usr/bin/hobot-audio-profile
   local PROFILES_SHARE_DIR=/usr/share/hobot_audio_config/profiles
+  # legacy profile-id aliases (pre-rename selections / nonint callers):
+  # map to the S100-aligned ids before any memory write or deploy
+  case "$sel" in
+    audio_hat_v2_4mic) sel="rdk_audio_kit_4mic" ;;
+    audio_hat_v2_6mic) sel="rdk_audio_kit_6mic_ring" ;;
+  esac
   # previous selection: governs whether the legacy rollback runs first
   # (engine default: no selection file = UNSET)
   local CUR
@@ -1815,13 +1821,13 @@ do_engine_audio_apply() {
       do_set_audio_machine
     fi
     audio_hat_type_string="es7210_es8156"
-  elif [ "$sel" = "audio_hat_v2_4mic" ] || [ "$sel" = "audio_hat_v2_6mic" ] || [ "$sel" = "hiwonder_hat" ] || [ "$sel" = "wm8960_hat" ]; then
+  elif [ "$sel" = "rdk_audio_kit_4mic" ] || [ "$sel" = "rdk_audio_kit_6mic_ring" ] || [ "$sel" = "waveshare_hat_v2" ] || [ "$sel" = "hiwonder_hat" ] || [ "$sel" = "wm8960_hat" ]; then
     if [ "$CUR" != "UNSET" ]; then
       do_unset_audio_hat
       CUR="$sel"
     fi
     case "$sel" in
-      audio_hat_v2_4mic|audio_hat_v2_6mic)
+      rdk_audio_kit_4mic|rdk_audio_kit_6mic_ring|waveshare_hat_v2)
         if [ -e /lib/modprobe.d/blacklist-hobot-codec-es7210.conf ]; then
           mv /lib/modprobe.d/blacklist-hobot-codec-es7210.conf /lib/modprobe.d/blacklist-hobot-codec-es7210.disable
           do_set_audio_machine
@@ -1941,19 +1947,20 @@ do_sound_devices_select() {
     audio_options=("UNSET")
 
     if [[ "$board_type_string" == *x5* ]]; then
-      audio_options=("""Audio Driver HAT V2 (4-Mic)"""  "    4 chn input and 2 chn output" \
-                    """Audio Driver HAT V2 (6-Mic Ring)"""  "    6 chn input and 2 chn output" \
+      audio_options=("""RDK Audio Kit 4-Mic"""  "    Decenta 4-mic, 4 chn input and 2 chn output" \
+                    """RDK Audio Kit 6-Mic"""  "    Decenta 6-mic ring, 6 chn input and 2 chn output" \
+                    """Waveshare Audio Driver HAT V2"""  "    4 chn input and 2 chn output" \
                     """Hiwonder Audio Driver HAT"""  "    2 chn input and 1 chn output" \
                     """WM8960 Audio Driver HAT"""  "    2 chn input and 2 chn output" \
                     ""UNSET"" "    Unset audio driver hat")
     elif [[ "$board_type_string" == *x3_rdk_v1* ]]; then
       audio_options=("""Audio Driver HAT V1"""  "    4 chn input and 2 chn ouput" \
-                    """Audio Driver HAT V2 (4-Mic)"""  "    4 chn input and 2 chn output" \
-                    """Audio Driver HAT V2 (6-Mic Ring)"""  "    6 chn input and 2 chn output" \
+                    """RDK Audio Kit 4-Mic"""  "    Decenta 4-mic, 4 chn input and 2 chn output" \
+                    """RDK Audio Kit 6-Mic"""  "    Decenta 6-mic ring, 6 chn input and 2 chn output" \
                     ""UNSET"" "    Unset audio driver hat")
     elif [[ "$board_type_string" == *x3_rdk_v2* ]] || [[ "$board_type_string" == *x3_md* ]]; then
-      audio_options=("""Audio Driver HAT V2 (4-Mic)"""  "    4 chn input and 2 chn output" \
-                    """Audio Driver HAT V2 (6-Mic Ring)"""  "    6 chn input and 2 chn output" \
+      audio_options=("""RDK Audio Kit 4-Mic"""  "    Decenta 4-mic, 4 chn input and 2 chn output" \
+                    """RDK Audio Kit 6-Mic"""  "    Decenta 6-mic ring, 6 chn input and 2 chn output" \
                     """WM8960 Audio Driver HAT"""  "    2 chn input and 2 chn output" \
                     ""UNSET"" "    Unset audio driver hat")
     fi
@@ -1975,7 +1982,7 @@ do_sound_devices_select() {
       return
     fi
     #if audio is es7210+es8156
-    if [ "$FUN" == "Audio Driver HAT V1" ] || [ "$FUN" == "Audio Driver HAT V2 (4-Mic)" ] || [ "$FUN" == "Audio Driver HAT V2 (6-Mic Ring)" ]; then
+    if [ "$FUN" == "Audio Driver HAT V1" ] || [ "$FUN" == "RDK Audio Kit 4-Mic" ] || [ "$FUN" == "RDK Audio Kit 6-Mic" ] || [ "$FUN" == "Waveshare Audio Driver HAT V2" ]; then
       if [ "$CUR" != "UNSET" ]; then
         do_unset_audio_hat
         CUR="$FUN"
@@ -2091,8 +2098,13 @@ do_unset_audio_hat(){
   #remove auto load module step 2 (legacy global conf and engine per-profile
   # entries, both the correct .conf and any historical .modules suffix)
   rm -f /etc/modules-load.d/99_hobot_audio_module.conf
+  rm -f /etc/modules-load.d/rdk_audio_kit_4mic.conf /etc/modules-load.d/rdk_audio_kit_4mic.modules
+  rm -f /etc/modules-load.d/rdk_audio_kit_6mic_ring.conf /etc/modules-load.d/rdk_audio_kit_6mic_ring.modules
+  # legacy pre-rename ids (kept so UNSET also cleans boards selected before
+  # the S100-aligned rename)
   rm -f /etc/modules-load.d/audio_hat_v2_4mic.conf /etc/modules-load.d/audio_hat_v2_4mic.modules
   rm -f /etc/modules-load.d/audio_hat_v2_6mic.conf /etc/modules-load.d/audio_hat_v2_6mic.modules
+  rm -f /etc/modules-load.d/waveshare_hat_v2.conf /etc/modules-load.d/waveshare_hat_v2.modules
   rm -f /etc/modules-load.d/audio_hat_v1.conf /etc/modules-load.d/audio_hat_v1.modules
   rm -f /etc/modules-load.d/hiwonder_hat.conf /etc/modules-load.d/hiwonder_hat.modules
   rm -f /etc/modules-load.d/wm8960_hat.conf /etc/modules-load.d/wm8960_hat.modules
